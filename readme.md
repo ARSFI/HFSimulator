@@ -1,12 +1,13 @@
-A practical Open Source Ionospheric Channel Simulator for Ham use.
+<h2> A practical Open Source Ionospheric Channel Simulator for Ham use. </h2>
 
 Rick Muething KN6KB, Tom Lafleur KA6IQA, Tom Whiteside N5TW
 
-Intro: This Article introduces a practical high-performance stand-alone and OS independent Ionospheric Channel
+This QST Article introduces a practical high-performance stand-alone and OS independent Ionospheric Channel
 Simulator. More details of the project and simulator are available in QEX and full open source documentation is
-available at ……ARSFI Git Hub link URL.
+available here.
 
 What is An Ionospheric Simulator?
+
 Every ham learns that much of our communication relies heavily on radio wave propagation through the Ionosphere
 layer. This layer reflects radio waves and can create single or multiple hop paths from station to station. While most
 radio waves involve this type of propagation it is not trivial to model the constantly changing Ionosphere to test and
