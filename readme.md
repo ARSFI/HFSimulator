@@ -1,4 +1,4 @@
-<h2> A practical Open Source Ionospheric Channel Simulator for Ham use. </h2>
+<h2> A practical Open Source Ionospheric Channel Simulator for Ham use </h2>
 
 Rick Muething KN6KB, Tom Lafleur KA6IQA, Tom Whiteside N5TW
 
