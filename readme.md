@@ -3,7 +3,7 @@
 Rick Muething KN6KB, Tom Lafleur KA6IQA, Tom Whiteside N5TW
 
 This project introduces a practical high-performance stand-alone and OS independent Ionospheric Channel
-Simulator, full open source documentation is available here.
+Simulator. Full open source documentation is available here.
 
 What is An Ionospheric Simulator?
 
