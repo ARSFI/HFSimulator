@@ -5,6 +5,8 @@ Rick Muething KN6KB, Tom Lafleur KA6IQA, Tom Whiteside N5TW
 This project introduces a practical high-performance stand-alone and OS independent Ionospheric Channel
 Simulator. Full open source documentation is available here.
 
+A feature article with more detail will appear in QEX end of 2021.
+
 What is An Ionospheric Simulator?
 
 Every ham learns that much of our communication relies heavily on radio wave propagation through the Ionosphere
