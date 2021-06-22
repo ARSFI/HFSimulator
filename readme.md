@@ -20,3 +20,7 @@ set of standardized “representative test channels” that would allow computer
 statistically model HF radio propagation by manipulating the modulating audio. This has been used over the years to
 develop, test, and improve many of the various digital and digital voice protocol we use today.
 
+A few complete units are available for $250 (plus shipping except: free shipping in USA and Canada) or 
+a few blank boards for $20 each.
+
+
