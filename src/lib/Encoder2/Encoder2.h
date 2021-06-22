@@ -4,7 +4,7 @@
  *
  *  Tom Lafleur, tom@lafleur.us
  *
- * Version 2.0 - Change algorithm to a table decode method... 26 Feb 2020
+ * Version 2.0 - Change algorithm to a table decode method... TRL 26 Feb 2020
  *
  *          https://www.best-microcontroller-projects.com/rotary-encoder.html
  *                    
