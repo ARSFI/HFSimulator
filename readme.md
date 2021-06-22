@@ -7,6 +7,8 @@ Simulator. Full open source documentation is available here.
 
 A feature article with more detail will appear in QEX end of 2021.
 
+The Amateur Radio Safety Foundation introduces the IONOS Channel Simulator, an audio-processing, 1-4 path (ray) simulator that models common HF and VHF/UHF propagation channels. It is intended to accelerate modem and protocol design, analysis, optimization and comparison, but has other uses as well. It allows off-air laboratory testing and evaluation of radio protocols and modems using statistically-standardized channel characteristics that would be almost impossible to achieve with over-the-air RF testing. Automation features allow scripting for multiple test runs under automatic control for huge time and labor savings. Since no transceivers are needed, the device may also be used as an inexpensive operator training station for exercising and teaching digital mode software. The simulator is based on the well-documented Watterson model [1] used by many laboratory grade instruments costing many thousands of dollars.
+
 What is An Ionospheric Simulator?
 
 Every ham learns that much of our communication relies heavily on radio wave propagation through the Ionosphere
