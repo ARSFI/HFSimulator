@@ -1,5 +1,5 @@
 <h2><em><a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html>BUY Fully Assembled IONOS</a></em></h2>
-<h2> A practical Open Source Ionospheric Channel Simulator<h2>                      
+<h2> A practical Open Source Ionospheric Channel Simulator</h2>                      
 
 Rick Muething KN6KB, Tom Lafleur KA6IQA, Tom Whiteside N5TW
 
@@ -27,7 +27,7 @@ develop, test, and improve many of the various digital and digital voice protoco
 
 A few complete units are available from The Amateur Radio Safety Foundation. 
 
-<em><strong>Featured in the March/April 2022 issue of ARRL's QEX Magazine.  <a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html> BUY IONOS </a></strong></em>
+<em><strong>Featured in the March/April 2022 issue of ARRL's QEX Magazine.  <br><a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html> BUY IONOS </a></strong></em>
 
 
 
