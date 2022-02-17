@@ -1,4 +1,4 @@
-<h2> A practical Open Source Ionospheric Channel Simulator</h2>
+<h2> A practical Open Source Ionospheric Channel Simulator                      <em><a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html> BUY IONOS </a></em</h2>
 
 Rick Muething KN6KB, Tom Lafleur KA6IQA, Tom Whiteside N5TW
 
