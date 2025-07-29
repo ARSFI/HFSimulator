@@ -26,4 +26,6 @@ S​ource code and binary HEX files for the updated TFT display are also availab
 To use this board for IONOS, as a minimun, just install the two encoders, P1 and replace R5,R6,R9,R10 with jumpers.
 Nothing else is needed...
 
+If you build code from source, you will need Teensyduino version 1.60b4 or newer to support the ST7789 TFT display.
+
 tom@lafleur.us ka6iqa
