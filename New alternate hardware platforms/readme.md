@@ -21,7 +21,7 @@ https://jlcpcb.com/
 We have a version of code that runs on the board, with modification for the new TFT display.
 
 ​Design documents for the ​"encoder proto board​", including schematics, and gerber files are available on this site​.
-S​ource code and binary HEX files for the updated TFT display is also available.
+S​ource code and binary HEX files for the updated TFT display are also available.
 
 To use this board for IONOS, as a minimun, just install the two encoders, P1 and replace R5,R6,R9,R10 with jumpers.
 Nothing else is needed...
