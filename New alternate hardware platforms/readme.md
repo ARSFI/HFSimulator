@@ -23,4 +23,7 @@ We have a version of code that runs on the board, with modification for the new 
 ​Design documents for the ​"encoder proto board​", including schematics, and gerber files are available on this site​.
 S​ource code for the updated TFT display is also available.
 
+To use this board for IONOS, as a minimun, just install the two encoders, P1 and replace R5,R6,R9,R10 with jumpers.
+Nothing else is needed...
+
 tom@lafleur.us ka6iqa
