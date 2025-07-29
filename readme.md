@@ -27,6 +27,8 @@ develop, test, and improve many of the various digital and digital voice protoco
 
 A few blank boards are available from The Amateur Radio Safety Foundation. Completed units are sold out!
 
+For hardware update see:  https://github.com/ARSFI/HFSimulator/tree/master/New%20alternate%20hardware%20platforms
+
 <em><strong>Featured in the March/April 2022 issue of ARRL's QEX Magazine.  <br><a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html> BUY IONOS </a></strong></em>
 
 
