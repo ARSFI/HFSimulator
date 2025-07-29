@@ -1,12 +1,14 @@
 
-As the completed IONOS development boards are sold, we have looked for an alternative platform​ for users of this software...
+As the completed IONOS development boards are sold-out, we have looked for an alternative platform​ for users of this software...
+(A few bare boards are still available!)
 
-There is an option...
+There is an option....
 
 Proto-supply has a development board using the Teensy 4.1, a 320x480 TFT display, and a SGL5000 Codex.
 https://protosupplies.com/product/mini-platform-teensy41/
 
-All that is needed to run the IONOS code is a pair of encoders!, just wire them to their I/O connector, 7 wires.
+All that is needed to run the IONOS code is a pair of encoders!,
+just wire them to their I/O connector, 7 wires.
 https://protosupplies.com/product/dual-rotary-encoder-module/
 
 There is NO Audio buffering on the mini-platform, so audio in-out is connected directly to the SGL5000 codex.
