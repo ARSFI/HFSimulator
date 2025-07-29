@@ -18,7 +18,7 @@ As a minimum, you need only to install the two encoders, the 24 pin I/O connecto
 The cost was less than $8 for 5 boards plus shipping from:
 https://jlcpcb.com/
 
-We have a version of code that runs on the board, with modification for the new TFT display).
+We have a version of code that runs on the board, with modification for the new TFT display.
 
 ​Design documents for the ​"encoder proto board​", including schematics, and gerber files are available on this site​.
 S​ource code for the updated TFT display is also available.
