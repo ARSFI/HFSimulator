@@ -1,4 +1,4 @@
-<h2><em><a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html>BUY Fully Assembled IONOS</a></em></h2>
+
 <h2> A practical Open Source Ionospheric Channel Simulator</h2>                      
 
 Rick Muething KN6KB, Tom Lafleur KA6IQA, Tom Whiteside N5TW
@@ -25,7 +25,7 @@ set of standardized “representative test channels” that would allow computer
 statistically model HF radio propagation by manipulating the modulating audio. This has been used over the years to
 develop, test, and improve many of the various digital and digital voice protocol we use today.
 
-A few complete units are available from The Amateur Radio Safety Foundation. 
+A few blank boards are available from The Amateur Radio Safety Foundation. Completed units are sold out!
 
 <em><strong>Featured in the March/April 2022 issue of ARRL's QEX Magazine.  <br><a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html> BUY IONOS </a></strong></em>
 
