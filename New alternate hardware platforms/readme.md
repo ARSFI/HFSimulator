@@ -28,4 +28,6 @@ Nothing else is needed...
 
 If you build code from source, you will need Teensyduino version 1.60b4 or newer to support the ST7789 TFT display.
 
+https://forum.pjrc.com/index.php?forums/announcements.6/
+
 tom@lafleur.us ka6iqa
