@@ -29,7 +29,7 @@ Nothing else is needed...
 If you build code from source, you will need Teensyduino version 1.60b4 or newer to support the ST7789 TFT display.
 A .hex file is avilable:
 
-New alternate hardware platforms/src/build/teensy.avr.teensy41/HFSim_BFD_2_03_Proto.ino.hex
+https://github.com/ARSFI/HFSimulator/tree/master/New%20alternate%20hardware%20platforms/src/build/teensy.avr.teensy41
 
 https://forum.pjrc.com/index.php?forums/announcements.6/
 
