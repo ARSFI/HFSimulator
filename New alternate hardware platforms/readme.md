@@ -27,7 +27,8 @@ To use this board for IONOS, as a minimun, just install the two encoders, P1 and
 Nothing else is needed...
 
 If you build code from source, you will need Teensyduino version 1.60b4 or newer to support the ST7789 TFT display.
-A .hex file is avilable:
+
+A .hex file is avilable to directly load into the Teensy.
 
 https://github.com/ARSFI/HFSimulator/tree/master/New%20alternate%20hardware%20platforms/src/build/teensy.avr.teensy41
 
