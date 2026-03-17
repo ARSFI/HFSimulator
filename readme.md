@@ -25,7 +25,7 @@ set of standardized “representative test channels” that would allow computer
 statistically model HF radio propagation by manipulating the modulating audio. This has been used over the years to
 develop, test, and improve many of the various digital and digital voice protocol we use today.
 
-A few blank boards are available from The Amateur Radio Safety Foundation. Completed units are sold out!
+A few blank boards are available from The Amateur Radio Safety Foundation.
 
 For hardware update see:  https://github.com/ARSFI/HFSimulator/tree/master/New%20alternate%20hardware%20platforms
 
