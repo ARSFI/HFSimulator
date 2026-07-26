@@ -92,7 +92,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <Bounce2.h>
-#include <Encoder2.h>
+#include "Encoder2.h"
 //#include "SPI.h"
 #include "ILI9341_t3.h"
 #include <EEPROM.h>
