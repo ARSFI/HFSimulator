@@ -25,11 +25,16 @@ set of standardized “representative test channels” that would allow computer
 statistically model HF radio propagation by manipulating the modulating audio. This has been used over the years to
 develop, test, and improve many of the various digital and digital voice protocol we use today.
 
-A few blank boards are available from The Amateur Radio Safety Foundation. Completed units are sold out!
+A few blank boards are available from The Amateur Radio Safety Foundation.
 
 For hardware update see:  https://github.com/ARSFI/HFSimulator/tree/master/New%20alternate%20hardware%20platforms
 
-<em><strong>Featured in the March/April 2022 issue of ARRL's QEX Magazine.  <br><a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html> BUY IONOS </a></strong></em>
+<em><strong>Featured in the March/April 2022 issue of ARRL's QEX Magazine.  <br><a href=https://shop.arsfi.org/home/23-ionos-propagation-simulator.html> 
+
+A new small batch of IONOS development boards with a case is scheduled to be available as of April 2026.
+Due to the uncertainty regarding import tariffs and component costs, the final pricing for this batch has not yet been determined.
+
+BUY IONOS </a></strong></em>
 
 
 
