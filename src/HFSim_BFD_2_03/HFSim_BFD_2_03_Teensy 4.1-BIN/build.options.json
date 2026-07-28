@@ -1,0 +1,10 @@
+{
+  "additionalFiles": "",
+  "builtInLibrariesFolders": "/Users/lafleur/Library/Arduino15/libraries",
+  "compiler.optimization_flags": "",
+  "customBuildProperties": "",
+  "fqbn": "teensy:avr:teensy41:usb=serial,speed=600,opt=o2std,keys=en-us",
+  "hardwareFolders": "/Users/lafleur/Library/Arduino15/packages/teensy/hardware/avr/1.60.0,/Users/lafleur/Library/Arduino15/packages/teensy/hardware/avr/1.60.0",
+  "otherLibrariesFolders": "/Users/lafleur/Desktop/HF-IONOS/ION 2.03-proto 2/libraries",
+  "sketchLocation": "/Users/lafleur/Desktop/HF-IONOS/ION 2.03-proto 2/HFSim_BFD_2_03"
+}
