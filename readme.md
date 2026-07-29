@@ -34,7 +34,7 @@ For alternate hardware update see:  https://github.com/ARSFI/HFSimulator/tree/ma
 A new small batch of IONOS development boards with a case is scheduled to be available as of Aug 2026.
 Due to the uncertainty regarding import tariffs and component costs, the final pricing for this batch has not yet been determined.
 
-See BUY IONOS </a></strong></em>
+To buy assembled IONOS, boards and cases: https://shop.arsfi.org </a></strong></em>
 
 
 <h3> NOTE: Ver 2 and Ver 3 boards are identical, except that Ver 3 allows for socket pins for both Teensy 4.0 and 4.1. 
