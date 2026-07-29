@@ -1,10 +1,7 @@
 
-As the completed IONOS development boards are sold-out, we have looked for an alternative platform​ for users of this software...
-(A few bare boards are still available!)
+An alternative platform​ for users of this software..
 
-There is an option....
-
-Proto-supply has a development board using the Teensy 4.1, a 320x480 TFT display, and a SGTL5000 Codex.
+Proto-supply has a development board using the Teensy 4.1, a 320x480 TFT display, with a SGTL5000 Codex.
 https://protosupplies.com/product/mini-platform-teensy41/
 
 All that is needed to run the IONOS code is a pair of encoders!,
@@ -20,15 +17,15 @@ https://jlcpcb.com/
 
 We have a version of code that runs on the board, with modification for the new TFT display.
 
-​Design documents for the ​"encoder proto board​", including schematics, and gerber files are available on this site​.
-S​ource code and binary HEX files for the updated TFT display are also available.
+​Design documents for the ​"encoder proto board​", including schematics, and Gerber files are available on this site​.
+Source code and binary HEX files for the updated TFT display are also available.
 
-To use this board for IONOS, as a minimun, just install the two encoders, P1 and replace R5,R6,R9,R10 with jumpers.
+To use this board for IONOS, as a minimum, just install the two encoders, P1 and replace R5,R6,R9,R10 with jumpers.
 Nothing else is needed...
 
 If you build code from source, you will need Teensyduino version 1.60b4 or newer to support the ST7789 TFT display.
 
-A .hex file is avilable to directly load into the Teensy.
+A .hex file is available to directly load into the Teensy.
 
 https://github.com/ARSFI/HFSimulator/tree/master/New%20alternate%20hardware%20platforms/src/build/teensy.avr.teensy41
 
