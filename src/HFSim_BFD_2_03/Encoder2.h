@@ -50,6 +50,7 @@
 #define ENCODER_USE_INTERRUPTS
 #define ENCODER_ARGLIST_SIZE CORE_NUM_INTERRUPT
 #include "utility/interrupt_pins.h"
+
 #ifdef ENCODER_OPTIMIZE_INTERRUPTS
 #include "utility/interrupt_config.h"
 #endif
