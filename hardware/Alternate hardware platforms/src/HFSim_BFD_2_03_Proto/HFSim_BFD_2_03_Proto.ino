@@ -2520,7 +2520,12 @@ void loop()
                   if (ParseSetSimParameter(strParameter, intSerialCmdMode))
                     {
                       Serial.println("OK"); //Serial Command is OK
-                      if (intSerialCmdMode < 5){ ParseSetParameter(strParameter, intSerialCmdMode);}
+                      if (intSerialCmdMode < 5)
+                        {
+                          intMode = intSerialCmdMode;
+                          blnInitialized = false;
+                          ParseSetParameter(strParameter, intSerialCmdMode);
+                        }
                     }
                   else { Serial.println("?"); }//Serial Command fail}
                 }
