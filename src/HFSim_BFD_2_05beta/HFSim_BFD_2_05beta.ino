@@ -115,7 +115,7 @@
 #error "Release builds require an attested BuildIdentity.h"
 #endif
 static const char chrBuildIdentity[] = HFSIM_GIT_DESCRIBE "@" HFSIM_BUILD_UTC;
-#define HFSIM_FIRMWARE_REVISION "b1"
+#define HFSIM_FIRMWARE_REVISION "2.06"
 
 Encoder2 ENC1(1, 0); // (right) modes
 Encoder2 ENC2(4, 3); // (left) parameters
@@ -1514,7 +1514,8 @@ void PrintDSPStateAck(boolean blnConfirmed)
 
 void PrintLevelFields()
 {
-  Serial.print(" INPUT_MVPP="); Serial.print(fltppLPInputMeasAvg, 1);
+  Serial.print(" INPUT_MVPP="); Serial.print(int(fltppInputForDisplay));
+  Serial.print(" INPUT_MVPP_MAXHOLD="); Serial.print(fltppLPInputMeasAvg, 1);
   Serial.print(" LEFT_OUT_MVPP="); Serial.print(fltppAmpLeftOutAvg, 1);
   Serial.print(" RIGHT_OUT_MVPP="); Serial.print(fltppAmpRightOutAvg, 1);
 }

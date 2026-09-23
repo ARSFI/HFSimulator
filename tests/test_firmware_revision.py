@@ -3,14 +3,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION = ROOT / "src" / "HFSim_BFD_2_05" / "HFSim_BFD_2_05.ino"
+PRODUCTION = ROOT / "src" / "HFSim_BFD_2_05beta" / "HFSim_BFD_2_05beta.ino"
 PROTO = (
     ROOT
     / "hardware"
     / "Alternate hardware platforms"
     / "src"
-    / "HFSim_BFD_2_05_Proto"
-    / "HFSim_BFD_2_05_Proto.ino"
+    / "HFSim_BFD_2_05beta_Proto"
+    / "HFSim_BFD_2_05beta_Proto.ino"
 )
 
 
@@ -25,11 +25,11 @@ class FirmwareRevisionTest(unittest.TestCase):
         self.assertFalse((proto_src / "HFSim_BFD_2_03_Proto").exists())
         self.assertFalse((proto_src / "HFSim_BFD_2_04_Proto").exists())
 
-    def test_live_revision_surfaces_report_2_05(self):
+    def test_live_revision_surfaces_report_2_06(self):
         for firmware in (PRODUCTION, PROTO):
             with self.subTest(firmware=str(firmware.relative_to(ROOT))):
                 source = firmware.read_text(encoding="utf-8")
-                self.assertIn('#define HFSIM_FIRMWARE_REVISION "2.05"', source)
+                self.assertIn('#define HFSIM_FIRMWARE_REVISION "2.06"', source)
                 self.assertIn('Serial.print(" REV=" HFSIM_FIRMWARE_REVISION)', source)
                 self.assertIn('F("HELP IONOS SIM Rev " HFSIM_FIRMWARE_REVISION)', source)
                 # Revision surfaces are macro-driven, never hardcoded old literals.
