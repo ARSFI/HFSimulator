@@ -28,6 +28,10 @@ develop, test, and improve many of the various digital and digital voice protoco
 <h3> NOTE: Ver 2 and Ver 3 boards are identical, except that Ver 3 allows for socket pins for both Teensy 4.0 and 4.1. 
 A Teensy 4.1 can be added to Ver 2 boards, but the extra pins are not in a socket. </h3>
 
+<h3> NOTE:  On the 3.0d rev PCB boards, the is a missing trace between U1-Pin-10 to R18, 
+This is D8 on the schematics.
+</h3>
+
 <em><strong>Featured in the March/April 2022 issue of ARRL's QEX Magazine.
 
 For alternate hardware update see:  
