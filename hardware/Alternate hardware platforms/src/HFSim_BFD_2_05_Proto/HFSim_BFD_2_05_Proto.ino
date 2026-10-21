@@ -1,3 +1,17 @@
+ 
+/*
+
+  Modification to support the Teensy 4.1. Proto board
+  https://protosupplies.com/product/mini-platform-teensy41/
+
+  Using ST7798_t3 TFT display at 320x480
+  Encoder pin remapping
+
+    tom@lafleur.us ka6iqa
+
+*/
+ 
+ 
  /*  IONOS SIM HF/VHF Channel Simulator  Rick Muething, KN6KB  rmuething@cfl.rr.com
        Copyright (C) 2020  Amateur Radio Safety Foundation Inc. (ARSFI)
        Licensed under the MIT Open Source Initiative.
@@ -12,6 +26,8 @@
 
     Change  Log:
     Date:     Rev:      Description:
+    9/21/2026    2.05   Classify the AdjustS_N calibration debug output by source: the fade loop's internal per-step S:N changes no longer print (so a running fade cannot flood the serial link), while operator-initiated changes (boot, front-panel dial, serial S:N command) still print one block. DEBUG ON|OFF verb re-enables the legacy per-step firehose and STATUS reports its state.
+    9/21/2026    2.04   Bump the consolidated firmware revision and sketch name.
     11/17/2020   2.03   Modify multipath delay settings for 4 path mode as suggested by Peter Helfert.
 
     11/7/2020    2.02   Make mods to 4 path implementation and re calibration fltSTD values for correct long term average level.
@@ -38,22 +54,30 @@
 
 
 
+// Changes to support ST7796 320x480 TFT, 9 July 2025, tom@lafleur ka6iqa
+
+  1) commented out all call's to // tft.begin();, as its NOT in ST7796_t3 lib
+  2) replace as needed with tft.setCursor(1,80);
+
+  3) added inclued's for ST7796_t3
+  #include <ST7796_t3.h>
+  #include <st7735_t3_font_Arial.h>
+  #include <Adafruit_FT6206.h>    <-- Touch screen driver (not used)
+
+4) txt_font is not avilable, using default font
+5) tft.setRotation(1); to tft.setRotation(3);
+6) as of 11 July, requires teensyduino >= 1.60 Beta 4
+    https://forum.pjrc.com/index.php?threads/teensyduino-1-60-beta-4.76907/
 
 
 
+A1 Connect to pin 41
+B1 Connect to pin 40
+SWT1 Connect to pin 39
 
-
-
-
-
-
-
-
-
-
-
-
-
+A2 Connect to pin 38
+B2 Connect to pin 27
+SWT2 Connect to pin 26
 
 
 
@@ -92,27 +116,74 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <Bounce2.h>
-#include "Encoder2.h"
-//#include "SPI.h"
-#include "ILI9341_t3.h"
+#include <Encoder2.h>
+
 #include <EEPROM.h>
 
-Encoder2 ENC1(1, 0); // (right) modes
-Encoder2 ENC2(4, 3); // (left) parameters
+#include <ST7796_t3.h>
+#include <st7735_t3_font_Arial.h>
+//#include <Adafruit_FT6206.h>    // <-- Touch screen driver (not used)
 
-// For the Adafruit shield  ILI9341, these are the default. (Pin 6 below was Pin 9. RM 3/2/2020)
-#define TFT_DC  6
+#if defined(__has_include)
+#if __has_include("BuildIdentity.h")
+#include "BuildIdentity.h"
+#endif
+#endif
+#ifndef HFSIM_GIT_DESCRIBE
+#define HFSIM_GIT_DESCRIBE "UNATTESTED"
+#endif
+#ifndef HFSIM_BUILD_UTC
+#define HFSIM_BUILD_UTC "UNATTESTED"
+#endif
+#if defined(HFSIM_RELEASE_BUILD) && (!defined(HFSIM_BUILD_IDENTITY_ATTESTED) || (HFSIM_BUILD_IDENTITY_ATTESTED != 1))
+#error "Release builds require an attested BuildIdentity.h"
+#endif
+static const char chrBuildIdentity[] = HFSIM_GIT_DESCRIBE "@" HFSIM_BUILD_UTC;
+#define HFSIM_FIRMWARE_REVISION "2.05"
+
+// For the Adafruit shield  Proto ST7798, these are the default. 
+#define TFT_DC  9
 #define TFT_CS 10
-#define ENC1Button 2//Right (parameter) 
-#define ENC2Button 5//Left  (mode)
 
-//Code for Serial Numbers (These two 32 bit numbers are used to generate MAC address (not used) and 4 digit Serial Number. 
-#define OCOTP_CFG0 (*(uint32_t *)0x401F4410)// lower 13 bits define the "Serial Num" ( & with 8191)
-#define OCOTP_CFG1 (*(uint32_t *)0x401F4420)// currently not used.
+ST7796_t3 tft = ST7796_t3(TFT_CS, TFT_DC);
+
+
+// For Teensy 4.1 Proto board
+#define ENC1A_Pin 38
+#define ENC1B_Pin 27
+#define ENC2A_Pin 41
+#define ENC2B_Pin 40
+
+#define ENC1Button 26 // Right (parameter) 
+#define ENC2Button 39 // Left  (mode)
+
+/* Swap L-->R encoder
+// For Teensy 4.1 Proto board
+#define ENC1A_Pin 41
+#define ENC1B_Pin 40
+#define ENC2A_Pin 38
+#define ENC2B_Pin 27
+
+#define ENC1Button 39 // Right (parameter) 
+#define ENC2Button 26 // Left  (mode)
+*/
+
+Encoder2 ENC1(ENC1A_Pin, ENC1B_Pin); // (right) modes
+Encoder2 ENC2(ENC2A_Pin, ENC2B_Pin); // (left) parameters
 
 Bounce debouncer1 = Bounce();
 Bounce debouncer2 = Bounce();
-ILI9341_t3 tft = ILI9341_t3(TFT_CS, TFT_DC);
+
+#define TFT_Screen_Rotate 3
+
+#define SCL1  16    // pin 16 for Teensy 4.0 SCL1
+#define SDA1  17    // pin 17 for Teensy 4.0 SDA1
+#define DISPLAY_ADDRESS1 0x72   // This is the default address of the OpenLCDp
+
+
+// Code for Serial Numbers (These two 32 bit numbers are used to generate MAC address (not used) and 4 digit Serial Number. 
+#define OCOTP_CFG0 (*(uint32_t *)0x401F4410)// lower 13 bits define the "Serial Num" ( & with 8191)
+#define OCOTP_CFG1 (*(uint32_t *)0x401F4420)// currently not used.
 
 // Teensy Audio components (currently 35 components used) 
 AudioControlSGTL5000            sgtl5000_1;
@@ -212,18 +283,15 @@ AudioConnection           pc2_12(ampLeftOut, ppAmpLeftOut);// p-p monitor for am
 AudioConnection           pc2_13(filLPIn_0_FIR, rmsLPInput);// LPDownmix output to rms measurement to allow PAPR computation.
 AudioConnection           pc2_14 (filLPWhiteFIR,rmsNoise); //rms measurement of BW filtered WGN
 
-//End of audio connections (Currently 38 connections) 
+// End of audio connections (Currently 38 connections) 
 
-#define SCL1  16 // pin 16 for Teensy 4.0 SCL1
-#define SDA1  17 // pin 17 for Teensy 4.0 SDA1
-#define DISPLAY_ADDRESS1 0x72 //This is the default address of the OpenLCDp
  typedef volatile struct fir_arg_float_t
 {
-  float x;        // input sample x
+  float x;          // input sample x
   uint16_t nh;      // length of vector h  
-  float *h;       // pointer to coefficient vector h
-  float *delayx;     // pointer to delay buffer
-  float r;        // output sample r
+  float *h;         // pointer to coefficient vector h
+  float *delayx;    // pointer to delay buffer
+  float r;          // output sample r
 } fir_arg_float;
 
 
@@ -237,29 +305,32 @@ static char  *chrBusyModes[] = {"ENB BUSY:       ", "DIS BUSY:       ", "LOW:   
                                 "THRESH:         ", "TONE ON:        ", "TONE OFF:       ", "CH1 IN          ", "BANDWIDTH       ", "SPECTRUM:       ", "SIM:            "
                                };
 
-//Strings
-String strMode = ""; String strParameter = ""; String strRevision = "    Rev 2.03";
+// Strings
+String strMode = ""; String strParameter = ""; String strRevision = "    Rev " HFSIM_FIRMWARE_REVISION "-Proto";
 String strLastCF = ""; String strLastLevel = "";
 
-//Boolean
-boolean blnSim = true;//Default for Simulator operation, false = busy detector mode.
+// Boolean
+boolean blnSim = true;      //Default for Simulator operation, false = busy detector mode.
 boolean blnInitialized = false; boolean blnEnableTestTone = false;
 boolean blnPlotSpectrum = false; boolean blnInitSpectrum = false; 
 boolean blnModes = true; boolean blnInitModes = true; boolean blnColon = false; boolean blnChanBusySent = false;
 boolean blnChanClearSent = false; boolean blnPlotBusyRed = false; boolean blnEnbBusyDetect = false;
 boolean blnTestMode3K = false; boolean blnTestMode6K = false; boolean blnInitializedFromEEPROM = false; boolean blnResetrmsMixIQCount = false; 
 boolean blnDisplayLvl = true;
+boolean blnDebugAdjustSN = false; // Opt-in DEBUG firehose: also print AdjustS_N calibration debug on the fade loop's internal per-step S:N changes. Default OFF so operator-initiated S:N changes (boot/dial/serial command) still print once, but a running fade cannot flood the serial link
 
 // Unsigned long
 unsigned long ulngLastSpectrumUpdateMs = millis(); unsigned long ulngLastLevelDisplayMs = millis();
+unsigned long ulngLastTFTWatchdogMs = 0; unsigned long ulngLastTFTRefreshMs = 0;
+unsigned long ulngAppliedGeneration = 0;
 unsigned long ulngLastDelayUpdateUs; unsigned long ulngCurrentElapsedTimeUs ; unsigned long ulngLastPPAvgTimeUs; unsigned long ulngLastSNUpdateUs;
 
-//Long
+// Long
 long lngENC1Old = 0; long lngENC2Old = 0; long lngENC1New = 0; long lngENC2New = 0; // For using Encoder2 library
 
-//Int
+// Int
 int intA3history = 0;  int intTargetSN = 40; int intBandwidth = 3000; int intLastBandwidth = 6000;
-int intMode = 0;// The main index 0 - 18. Always points to one of the 19 cases of chrModes
+int intMode = 0;    // The main index 0 - 18. Always points to one of the 19 cases of chrModes
 int intFadeRatePtr = 1; int intFMRatePtr = 1; int intFMDevPtr = 1;
 int intFadeDepth_dB = 0;// Fade depth in dB (0 to 40 dB) bounded to Minimum S:N of -40dB
 int intTuneOffset = 0;// Small (+/- 200 Hz max) frequency offset to allow check for tuning
@@ -274,7 +345,7 @@ static int intMaxSN = 40; static int intMinSN = -40; static int intMaxFade = 40;
 static int intMinOffset = -200; static int intMaxOffset = 200; static int intOffsetStep = 10; static int intNumModes = 19;
 static int intNumBusyModes = 11; static int intBaudRate[] = {4800, 9600, 14400, 19200, 38400, 57600, 115200};
 
-//Float
+// Float
 float fltppLPInputMeasAvg =0; float fltppLPInputPk; float fltrmsLPInputMeasAvg;// Measurement of filLPIn_0_FIR output
 float fltVLF_UpFreq = 100; float fltVLF_Amp = 0; float fltFadeRate = 0;
 float fltCurrentDelayI0Ms = 1.3378684807 ; float fltCurrentDelayI1Ms = 1.3378684807  ; //Minimum delays for I Channels (offsets 120 tap Hilbert Filter) 
@@ -292,6 +363,10 @@ static float fltNomInOutRatio = .41055;// Average calibration value for ratio In
 static float fltMinimumIDelayMs = 1.3378684807; //59 taps. Compensates for 59 tap delay for 119 tap Hilbert filter on  Q paths  
 static float fltNomCalLevel = 1800.0;
 
+// Last state rendered by the one-way DSP-to-display mirror.
+boolean blnTFTStateValid = false; boolean blnTFTStateSim = true; boolean blnTFTMirrorDrawing = false;
+int intTFTStateMode = -1; long lngTFTStateValue = 0;
+
 //Filters
 /*
   High pass FIR filter designed with
@@ -307,6 +382,7 @@ static float fltNomCalLevel = 1800.0;
   desired ripple = 1 dB
   actual ripple = .66 dB
 */
+
 static short sht7500HzHPCoef[120] = {
   171, -270, -54, 326, -105, -5, -180, 84, 38, 128, -66, -69, -104, 63, 98, 91, -73, -126, -81, 92, 152, 71, -119, -178, -57, 155, 204,
   38, -198, -229, -11, 250, 254, -25, -313, -277, 73, 388, 299, -138, -481, -319, 228, 598, 337, -354, -759, -352, 547, 997, 364, -874,
@@ -330,6 +406,7 @@ static short sht7500HzHPCoef[120] = {
   desired attenuation = -50 dB
   actual attenuation = -59.9 dB
 */
+
 static short sht6KHzLPFIRCoeffRev2[120] = {
   -18, -52, -45, -33, 6, 35, 36, 2, -38, -50, -18, 36, 66, 40, -27, -80, -69, 8, 89, 101, 23, -88, -135, -66, 74, 166,
   120, -42, -188, -182, -10, 195, 250, 85, -180, -318, -185, 137, 379, 309, -55, -423, -459, -77, 439, 637, 276, -412,
@@ -352,6 +429,7 @@ static short sht6KHzLPFIRCoeffRev2[120] = {
   desired attenuation = -50 dB
   actual attenuation = -66.8
 */
+
 static short sht3KHzLPFIRCoeffRev2[120] = {
   5, -6, -11, -17, -22, -24, -19, -8, 7, 24, 36, 39, 30, 10, -19, -47, -66, -67, -47, -8, 40, 85, 111, 105, 66, -2, -80, -146,
   -176, -154, -81, 30, 149, 239, 267, 215, 87, -90, -265, -384, -400, -291, -71, 210, 473, 631, 616, 399, 5, -478, -921, -1173,
@@ -361,7 +439,7 @@ static short sht3KHzLPFIRCoeffRev2[120] = {
 };
 
 // Alternate Hilbert filter 
-//Iowa Hills 119 Tap Phase Added BPF.ih_hilbert
+// Iowa Hills 119 Tap Phase Added BPF.ih_hilbert
 // Samp Freq=44100Hz, Fc 3.09KHz, BW:6.88KHz,Num Taps = 119, Phase Add:90 Kaiser Beta 2.8, Raised Cosine .930 Auto Gain -.1411
 // Add one 0 tap at end to satisfy Even # of taps requirement for Teensy FIR loader. 
 static double dblHilbertFIR_IowaHills_119TapsCoeff[120] {
@@ -407,8 +485,8 @@ static double dblHilbertFIR_IowaHills_119TapsCoeff[120] {
 short shtHilbertFIR_120TapCoeff[120]; //This array will be populated from the above
 void(* resetFunc)(void) = 0;//declare reset function at address 0
 
-/*****************Subroutine to adjust mixChannels gains to obtain desired S:N Simulation mode ***********/
-void AdjustS_N (int intDesiredSN_dB, float fltppLPInputMeasAvg)
+/* ****************Subroutine to adjust mixChannels gains to obtain desired S:N Simulation mode ********** */
+void AdjustS_N (int intDesiredSN_dB, float fltppLPInputMeasAvg, boolean blnOperatorSource)
 {
   //Sets the appropriate gains of mixChannels inputs 0,1 and 2 to obtain the desired S:N
   /*
@@ -441,25 +519,25 @@ void AdjustS_N (int intDesiredSN_dB, float fltppLPInputMeasAvg)
   mixChannels.gain(3, 0.0);//Insure other mixChannels input disabled  
    
     //  Debug printout for calibration 
-  if (intDesiredSN_dB != intLastDesiredSN_dB)
+  if ((blnOperatorSource || blnDebugAdjustSN) && (intDesiredSN_dB != intLastDesiredSN_dB))
     {
       Serial.println(" ");
       Serial.println("AdjustS_N:");
-      Serial.print(" DesiredSN_db= ");Serial.println(intDesiredSN_dB); 
-      Serial.print(" Bandwidth Correction Factor (dB)= ");Serial.println(fltSignalBWCorrectiondB);
-      Serial.print(" ppLPInputMeasAvg= ");Serial.println(fltppLPInputMeasAvg);
-      Serial.print(" fltrmsDelayI0Avg= ");Serial.print(fltrmsDelayI0Avg); Serial.print("   Computed rmsMixIQOutput= ");Serial.println(fltComputedrmsMixIQOutput);
-      Serial.print(" rmsNoiseAvg= ");Serial.println(fltrmsNoiseAvg);
-      Serial.print(" Desired SN Ratio= ");Serial.println(fltDesiredSNRatio);
-      Serial.print("    SigGain=");Serial.print(fltSignalGain); Serial.print("    NoiseGain=");Serial.println(fltNoiseGain);
-      Serial.print(" CF= ");Serial.println( fltppLPInputMeasAvg/(2.828 * fltrmsLPInputMeasAvg));
-      Serial.print(" intMultipaths = ");Serial.println(intMultipaths);
+      Serial.print(" DesiredSN_db= ");  Serial.println(intDesiredSN_dB); 
+      Serial.print(" Bandwidth Correction Factor (dB)= ");  Serial.println(fltSignalBWCorrectiondB);
+      Serial.print(" ppLPInputMeasAvg= ");  Serial.println(fltppLPInputMeasAvg);
+      Serial.print(" fltrmsDelayI0Avg= ");  Serial.print(fltrmsDelayI0Avg); Serial.print("   Computed rmsMixIQOutput= ");Serial.println(fltComputedrmsMixIQOutput);
+      Serial.print(" rmsNoiseAvg= "); Serial.println(fltrmsNoiseAvg);
+      Serial.print(" Desired SN Ratio= ");  Serial.println(fltDesiredSNRatio);
+      Serial.print("    SigGain="); Serial.print(fltSignalGain); Serial.print("    NoiseGain=");Serial.println(fltNoiseGain);
+      Serial.print(" CF= ");  Serial.println( fltppLPInputMeasAvg/(2.828 * fltrmsLPInputMeasAvg));
+      Serial.print(" intMultipaths = ");  Serial.println(intMultipaths);
       Serial.print(" rmsMixIQ1234Out="); Serial.println(fltrmsMixIQ1234Out);
       intLastDesiredSN_dB = intDesiredSN_dB;
     }
- }//**End AdjustS_N******************************************************************************************
+ }// **End AdjustS_N******************************************************************************************
 
-//*****************Subroutine to adjust mixChannels gains to obtain desired S:N for Busy Detector Testing ***
+// *****************Subroutine to adjust mixChannels gains to obtain desired S:N for Busy Detector Testing ***
 void AdjustBusyS_N (int intDesiredSN_dB, float fltppInpSelectMeasAvg , float fltppWhiteMeasAvg)
 {
   //Sets the appropriate gains of mixChannels inputs 0 and 2 to obtain the desired S:N
@@ -478,9 +556,9 @@ void AdjustBusyS_N (int intDesiredSN_dB, float fltppInpSelectMeasAvg , float flt
   }
   mixChannels.gain(1, 0); // Insures no bleed through of mixChannels input 1
   return;
-}//**End AdjustBusyS_N*************************************************************************************
+}// **End AdjustBusyS_N*************************************************************************************
 
-//*********Subroutine For Fading **************************************************************************
+// *********Subroutine For Fading **************************************************************************
 // Can be applied to all modes WGN-MPD. Adjusts mixChannels gains to obtain desired S:N and depth of fade
 void Fade (int intMaxSN_dB, int intFadeDepth_dB, float fltFadeRateHz)
 {
@@ -489,11 +567,11 @@ void Fade (int intMaxSN_dB, int intFadeDepth_dB, float fltFadeRateHz)
   float fltRunTimeSec = millis()/1000.0; //rollover only will happen every 50 days!
   intCurrentFadeSN_dB = intMaxSN_dB -  int((intFadeDepth_dB * .5 * (1 - cos(fltFadeRateHz * 2 * 3.14159 * fltRunTimeSec))));
   if (intCurrentFadeSN_dB < -40) { intCurrentFadeSN_dB = -40;} // bound minimum fade to intMinSN 
-  AdjustS_N (intCurrentFadeSN_dB , fltppLPInputMeasAvg);
+  AdjustS_N (intCurrentFadeSN_dB , fltppLPInputMeasAvg, false);// fade loop internal per-step S:N: never prints calibration debug (avoids blocking the serial chip inside the fade envelope loop) unless the DEBUG firehose is on
   return;
-}//**End Fade****************************************************************************************************
+}// **End Fade****************************************************************************************************
 
-//*************** From Iowa Hills FIR Filter Designer Version 7.0
+// *************** From Iowa Hills FIR Filter Designer Version 7.0
 /* File: 128 Tap Adj Gauss LPF Rev2.ih_fir
  * Sample Freq 64 Hz, Fc=.5856 Hz, Window Off, Num Taps 128, ~Gauss -.900, N Poles=9
  * Freq Response: 1Hz: -9.1dB, 2Hz: -37.1 dB, 3Hz: -66.8 dB; Group delay ~ 840 ms
@@ -539,7 +617,7 @@ static float gaus_fir_coeffs[128]
 -5.800659111239630410E-6,-4.468779263172822700E-6,-3.326665397016021600E-6,-2.375753489237729440E-6,
 -1.607534498745384790E-6,-1.006598637105850620E-6,-553.1753923550552370E-9,-225.2074190014706120E-9};
 
-//fir_float routine From Peter (processed at 64 x the Dopplar Spread ...not using Teensy Audio)  *********************
+// fir_float routine From Peter (processed at 64 x the Dopplar Spread ...not using Teensy Audio)  *********************
 float delay_bufferI1[128];
 float delay_bufferQ1[128];
 float delay_bufferI2[128];
@@ -653,6 +731,7 @@ void QuadGauss12FIR128( int Mode)
   firQ2.x = fltMagQ[1];
   fir_float(&firQ2);
   fltQ2 = firQ2.r;
+
   //Serial.print("Time for QuadGaussFIR128:(us):");Serial.println(micros() - ulngTstart);
   /* Explanation of how mixIQ combines and computes Mixed output for 2 Paths:
    *  Assume the fltMagI and fltMagQ values create two complex modulation vectors #1 is fltMagI[0] + j fltMagQ[0] 
@@ -673,7 +752,6 @@ void QuadGauss34FIR128( int Mode)
 {
   // Implements generation of Gaussian filtered noise  for the 2 Paths (I3,Q3, I4,Q4) case (expansion to 4 paths) 
  
-  
   float fltMagI[2]= {0.0, 0.0}; float fltMagQ[2]= {0.0, 0.0};  float fltComplexMagSq = 0.0 ;
   float fltComplexMag; float fltRoot; float fltSTD = 4.0 / 1.41421;// fltSTD for 4 paths comfirmed 11/6/2020. 
   float fltI3; float fltI4; float fltQ3; float fltQ4;
@@ -725,6 +803,7 @@ void QuadGauss34FIR128( int Mode)
   firQ4.x = fltMagQ[1];
   fir_float(&firQ4);
   fltQ4 = firQ4.r;
+
   //Serial.print("Time for QuadGaussFIR128:(us):");Serial.println(micros() - ulngTstart);
   /* Explanation of how mixIQ combines and computes Mixed output for 2 Paths:
    *  Assume the fltMagI and fltMagQ values create two complex modulation vectors #1 is fltMagI[0] + j fltMagQ[0] 
@@ -759,12 +838,13 @@ void PlotSpectrum(float fltFFTBins[], int intLowHz, int intHighHz, boolean blnIn
   if (blnInitSpectrum)//initialize tft, set rotation, clear screen, initialize text (will cause flicker)
     {
       blnInitSpectrum = false;
-      tft.begin();
+
+      // tft.begin();
       tft.setCursor(0,0);
-      tft.setRotation(1);
-      tft.fillScreen(ILI9341_BLACK);
-      tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println("    SPECTRUM");
-      tft.setTextColor(ILI9341_WHITE);
+      //tft.setRotation(3);
+      tft.fillScreen(ST7735_BLACK);
+      tft.setTextColor(ST7735_CYAN);  tft.setTextSize(3);  tft.println("    SPECTRUM");
+      tft.setTextColor(ST7735_WHITE);
       if (intBW == 3000){tft.setTextSize(2);tft.println(" 0 Hz               3.5KHz");}
       else {tft.setTextSize(2); tft.println(" 0 Hz               6.5KHz");}
     }
@@ -774,25 +854,25 @@ void PlotSpectrum(float fltFFTBins[], int intLowHz, int intHighHz, boolean blnIn
         {
         if ((( i / 3) >= intLowBin) & ((i / 3) <= intHighBin))
           {
-            tft.drawLine (40 + i, 238, 40 + i, 48, ILI9341_BLACK); //paint "BLACK" over old plot to eliminate flicker
-            tft.drawLine (41 + i, 238, 41 + i, 48, ILI9341_BLACK); //paint "BLACK" over old plot to eliminate flicker
+            tft.drawLine (40 + i, 238, 40 + i, 48, ST7735_BLACK); //paint "BLACK" over old plot to eliminate flicker
+            tft.drawLine (41 + i, 238, 41 + i, 48, ST7735_BLACK); //paint "BLACK" over old plot to eliminate flicker
             if (blnPlotBusyRed)// Plot region of interest in Red if channel determined busy by SearchRatioDetect
               {
-                tft.drawLine (40 + i, 238, 40 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ILI9341_RED); //
-                tft.drawLine (41 + i, 238, 41 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ILI9341_RED);
+                tft.drawLine (40 + i, 238, 40 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ST7735_RED); //
+                tft.drawLine (41 + i, 238, 41 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ST7735_RED);
               }
             else
               {
-                tft.drawLine (40 + i, 238, 40 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ILI9341_GREEN); //
-                tft.drawLine (41 + i, 238, 41 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ILI9341_GREEN);
+                tft.drawLine (40 + i, 238, 40 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ST7735_GREEN); //
+                tft.drawLine (41 + i, 238, 41 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ST7735_GREEN);
               }
           }
         else
           {
-            tft.drawLine (40 + i, 238, 40 + i, 48, ILI9341_BLACK); //paint "BLACK" over old plot to eliminate flicker
-            tft.drawLine (41 + i, 238, 41 + i, 48 , ILI9341_BLACK); //paint "BLACK" over old plot to eliminate flicker
-            tft.drawLine (40 + i, 238, 40 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ILI9341_YELLOW); //
-            tft.drawLine (41 + i, 238, 41 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ILI9341_YELLOW);
+            tft.drawLine (40 + i, 238, 40 + i, 48, ST7735_BLACK); //paint "BLACK" over old plot to eliminate flicker
+            tft.drawLine (41 + i, 238, 41 + i, 48 , ST7735_BLACK); //paint "BLACK" over old plot to eliminate flicker
+            tft.drawLine (40 + i, 238, 40 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ST7735_YELLOW); //
+            tft.drawLine (41 + i, 238, 41 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 3])))), ST7735_YELLOW);
           }
         }
       return;
@@ -803,130 +883,18 @@ void PlotSpectrum(float fltFFTBins[], int intLowHz, int intHighHz, boolean blnIn
         {
           if (( i / 2 >= intLowBin) && (i / 2 <= intHighBin))
             {
-              tft.drawLine (10 + i, 238, 10 + i, 48, ILI9341_BLACK); //paint "BLACK" over old plot to eliminate flicker
-              tft.drawLine (10 + i, 238, 10 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 2])))), ILI9341_GREEN); //value 25 sets display vertical scaling
+              tft.drawLine (10 + i, 238, 10 + i, 48, ST7735_BLACK); //paint "BLACK" over old plot to eliminate flicker
+              tft.drawLine (10 + i, 238, 10 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 2])))), ST7735_GREEN); //value 25 sets display vertical scaling
             }
           else
             {
-              tft.drawLine (10 + i, 238, 10 + i, 48, ILI9341_BLACK); //paint "BLACK" over old plot to eliminate flicker
-              tft.drawLine (10 + i, 238, 10 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 2])))), ILI9341_YELLOW); //value 25 sets display vertical scaling
+              tft.drawLine (10 + i, 238, 10 + i, 48, ST7735_BLACK); //paint "BLACK" over old plot to eliminate flicker
+              tft.drawLine (10 + i, 238, 10 + i, (238 - (50 * max(0, log10(fltFFTBins[i / 2])))), ST7735_YELLOW); //value 25 sets display vertical scaling
             }
         }
       return;
     } 
  }// End PlotSpectrum *****************************************************************************************
-
-//*******Function to Parse and Set Parameter received via Serial Port **********************
-boolean ParseSetParameter(String strParameter, int intMode)
-// Determins if strParameter is compatible with intMode. if not returns false
-// If compatible sets the parameter and Mode, Updates display showing mode and parameter and returns true
-{
-  int intParam = strParameter.toInt(); String str1; String str2; String str3; float fltParam = strParameter.toFloat();
-  if (intMode < 5)//WGN thru MPD
-  {
-    intParam = strParameter.toInt();
-    if ((-40 <= intParam) && (intParam <= 40))
-    {
-      //Serial.print(" ENC1 intTargetSN= ");Serial.println(intTargetSN);;
-      intTargetSN = intParam;
-      str1 = chrModes[intMode];  str2 = "    S:N= " + String(intTargetSN); str3 = " dB";
-      UpdateTFTModeParameter(str1, str2, str3);
-      return true;
-    }
-  }
-  if (intMode == 5)//MULTIPATHS
-  {
-    if ((intParam == 2) || (intParam == 4)) 
-      {
-        intMultipaths = intParam; return true;
-      }
-  
-   
-  }
-  if (intMode == 6)//FADE DEPTH
-  {
-    if ((intParam >= 0) && (intParam <= 40))
-    {
-      intFadeDepth_dB = intParam;
-      str1 = chrModes[intMode]; str2 = "      " + String(intParam) ; str3 =  " dB";
-      UpdateTFTModeParameter(str1, str2, str3);
-      return true;
-    }
-  }
-  if (intMode == 7)//FADE FREQ  fltFadeRates
-  {
-    for (int j = 0; j < 9; j += 1)
-      if  ((abs(fltLogs[j] - fltParam)) < .01)
-      {
-        intFMDevPtr = j;
-        str1 = chrModes[intMode]; str2 = "      " + String(10 * fltLogs[j]) ; str3 =  " Hz";
-        UpdateTFTModeParameter(str1, str2, ""); 
-        return true;
-      }
-  }
-  if (intMode == 8)//OFFSET
-    {
-      if ((intParam >= -200) && (intParam <= 200))
-        {
-          intTuneOffset = intParam;
-          str1 = chrModes[intMode]; str2 = "      " + String(intParam) ; str3 =  " Hz";
-          UpdateTFTModeParameter(str1, str2, str3);
-          return true;
-        }
-    }
-  if (intMode == 9)// FM DEVIATION  
-    {
-      for (int j = 0; j < 9; j ++)
-        if  ((abs(fltLogs[j] - fltParam)) < .001)
-          {
-            intFMDevPtr = j;
-            str1 = chrModes[intMode]; str2 = "      " + String(100 * fltLogs[j]) ; str3 =  " Hz";
-            UpdateTFTModeParameter(str1, str2, "");
-            return true;
-          }
-    }
-  if (intMode == 10)//FM RATE 
-  {
-
-    for (int j = 0; j < 9; j += 1)
-      if ((abs(fltLogs[j] - fltParam)) < .001)
-      {
-        intFMRatePtr = j;
-        str1 = chrModes[intMode]; str2 = "      " + String(100 * fltLogs[j]) ; str3 =  " Hz";
-        UpdateTFTModeParameter(str1, str2, "");
-        return true;
-      }
-  }
-  if ((intMode >= 11) && (intMode <= 14)) //IN and OUT levels
-  {
-    intParam = strParameter.toInt();
-    if ((intParam >= 0) && (intParam <= 20))
-    {
-      intGainLevel[intMode - 11] = intParam;//Serial.print("Line 795: intParam= ");Serial.println(intParam);
-      str1 = chrModes[intMode]; str2 = "      " + String(intParam) ; str3 =  "";
-      UpdateTFTModeParameter(str1, str2, str3);
-      return true;
-    }
-  }
-  if (intMode == 15)//Bandwidth
-  {
-    intParam = strParameter.toInt();
-    if ((intParam == 3000) || (intParam == 6000))
-    {
-      intBandwidth = intParam;
-      str1 = chrModes[intMode]; str2 = "      " + String(intBandwidth) ; str3 =  " Hz";
-      UpdateTFTModeParameter(str1, str2, str3);
-      return true;
-    }
-    else {
-      return false;
-    }
-  }
-  else {
-    return false;
-  }
-
-}// End ParseSetParameter **************************************************************
 
 // Subroutine for Setting Filter Bandwith**********************************************************
 void SetFilterBandwidth(int intBW)
@@ -954,6 +922,7 @@ void SetFilterBandwidth(int intBW)
   }
   return;
 }//END SetFilterBandwidth ************************************************************************
+
 
 // Subroutine to set IQ Tap delays based on intMode ********************************************
 void SetIQTapDelays(int intMode)
@@ -1010,9 +979,46 @@ void SetIQTapDelays(int intMode)
                       delayI.delay(2, fltMinimumIDelayMs + 4.0);delayQ.delay(2, 4.0);   //MPD Path #3 
                       delayI.delay(3, fltMinimumIDelayMs + 6.0);delayQ.delay(3, 6.0); break; //MPD Path #4
         }
+        
       }
-    Serial.print("Line 1014 SetIQTapDelays: intMode = ");Serial.print(intMode); Serial.print("  Paths:"); Serial.println(intMultipaths);
+    //Serial.print("Line 1014 SetIQTapDelays: intMode = ");Serial.print(intMode); Serial.print("  Paths:"); Serial.println(intMultipaths);
 } // End SetIQTapDelays **************************************************************************
+
+boolean ApplyChannelMode(int intRequestedMode)
+{
+  if ((!blnSim) || (intRequestedMode < 0) || (intRequestedMode > 4)) {return false;}
+
+  intMode = intRequestedMode;
+  blnTestMode3K = false; blnTestMode6K = false; blnEnableTestTone = false;
+  InputTestWaveform.amplitude(0);
+  mixInpSel.gain(0, 0); mixInpSel.gain(1, 0.0);
+  mixInpSel.gain(2, 100 * fltLogs[intGainLevel[0]]); mixInpSel.gain(3, 100 * fltLogs[intGainLevel[1]]);
+  ampLeftOut.gain(fltLogs[intGainLevel[2]]); ampRightOut.gain(fltLogs[intGainLevel[3]]);
+  intCountrmsMixIQ1234Out = 0;
+  SetIQTapDelays(intMode);
+
+  if (intMode == 0)
+    {
+      mixIQ12.gain(0, 0.0); mixIQ12.gain(1, .8498); mixIQ12.gain(2, 0.0); mixIQ12.gain(3, 0.0);
+      mixIQ1234.gain(0, 1.0); mixIQ1234.gain(1, 0.0); mixIQ1234.gain(2, 0.0); mixIQ1234.gain(3, 0.0);
+      if ((intTuneOffset != 0) || (intFMDevPtr != 0))
+        {mixPathSel.gain(0, 0.0); mixPathSel.gain(1, 2.0819); mixPathSel.gain(2, 0.0); mixPathSel.gain(3, 0.0);}
+      else
+        {mixPathSel.gain(0, .5); mixPathSel.gain(1, 0.0); mixPathSel.gain(2, 0.0); mixPathSel.gain(3, 0.0);}
+    }
+  else
+    {
+      mixPathSel.gain(0, .5); mixPathSel.gain(1, 0.0); mixPathSel.gain(2, 0.0); mixPathSel.gain(3, 0.0);
+      if (intMultipaths == 2)
+        {mixIQ1234.gain(0, 1.0); mixIQ1234.gain(1, 0.0); mixIQ1234.gain(2, 0.0); mixIQ1234.gain(3, 0.0);}
+      else
+        {mixIQ1234.gain(0, 1.0); mixIQ1234.gain(1, 1.0); mixIQ1234.gain(2, 0.0); mixIQ1234.gain(3, 0.0);}
+    }
+
+  blnModes = true; blnInitialized = true;
+  ulngAppliedGeneration++;
+  return true;
+}
 
 //******Function to Parse Simulator Mode received via Serial Port *********************************
 int ParseSimMode (String strMode)
@@ -1033,6 +1039,7 @@ int ParseSimMode (String strMode)
   return -1;
 }// End of ParseSimMode ************************************************************************
 
+
 //******Function to Parse Busy Mode received via Serial Port **************************************
 int ParseBusyMode (String strMode)
 {
@@ -1047,13 +1054,51 @@ int ParseBusyMode (String strMode)
         Serial.println("OK");
         blnSim = true;  blnInitialized = false;  blnEnableTestTone = false; blnInitializedFromEEPROM = false;
         blnPlotSpectrum = false; blnInitSpectrum = false; 
-        setup();
+        setup();        // <-------------------------------------------------  why this here?? TRL
       }
       return i;
     }
   }
   return -1;
 }// End of ParseBusyMode ****************************************************************************
+
+
+// Reject empty or partially numeric values before String::toInt()/toFloat().
+boolean IsNumericParameter(String strValue)
+{
+  strValue.trim();
+  if (strValue.length() == 0) {return false;}
+  boolean blnDigitSeen = false; boolean blnDecimalSeen = false;
+  for (unsigned int i = 0; i < strValue.length(); i++)
+    {
+      char chrValue = strValue.charAt(i);
+      if ((chrValue >= '0') && (chrValue <= '9')) {blnDigitSeen = true; continue;}
+      if (((chrValue == '+') || (chrValue == '-')) && (i == 0)) {continue;}
+      if ((chrValue == '.') && (!blnDecimalSeen)) {blnDecimalSeen = true; continue;}
+      return false;
+    }
+  return blnDigitSeen;
+}
+
+boolean IsIntegerParameter(String strValue)
+{
+  strValue.trim();
+  if (strValue.length() == 0) {return false;}
+  unsigned int intStart = ((strValue.charAt(0) == '+') || (strValue.charAt(0) == '-')) ? 1 : 0;
+  if (intStart == strValue.length()) {return false;}
+  for (unsigned int i = intStart; i < strValue.length(); i++)
+    {
+      if ((strValue.charAt(i) < '0') || (strValue.charAt(i) > '9')) {return false;}
+    }
+  return true;
+}
+
+boolean SimulationParameterSyntaxValid(String strValue, int intRequestedMode)
+{
+  if ((intRequestedMode <= 6) || (intRequestedMode == 8) || (intRequestedMode == 15))
+    {return IsIntegerParameter(strValue);}
+  return IsNumericParameter(strValue);
+}
 
 //*******Function to Parse and Set Simulation Parameter received via Serial Port **********************
 boolean ParseSetSimParameter(String strParameter, int intMode)
@@ -1072,11 +1117,19 @@ boolean ParseSetSimParameter(String strParameter, int intMode)
           return true;
         }
      }
-  if (intMode == 5)//INTMULTIPATHS
+  if (intMode == 5) //INTMULTIPATHS
     {
       intParam = strParameter.toInt();
       if ((intParam == 2) || (intParam == 4))
-        { intMultipaths = intParam; return true; }
+        {
+          intMultipaths = intParam;
+          if ((::intMode >= 0) && (::intMode <= 4)) {SetIQTapDelays(::intMode);}
+          if (intMultipaths == 2)
+            {mixIQ1234.gain(0,1.0); mixIQ1234.gain(1,0.0); mixIQ1234.gain(2,0.0); mixIQ1234.gain(3,0.0);}
+          else
+            {mixIQ1234.gain(0,1.0); mixIQ1234.gain(1,1.0); mixIQ1234.gain(2,0.0); mixIQ1234.gain(3,0.0);}
+          return true;
+        }
       else {return false;}
     }
   if (intMode == 6)//FADE DEPTH
@@ -1102,6 +1155,16 @@ boolean ParseSetSimParameter(String strParameter, int intMode)
       if ((intParam >= -200) && (intParam <= 200))
         {
           intTuneOffset = intParam;
+          sine_VLF_Dnmix_Mod.amplitude(0);
+          sine_Dnmix.frequency(7700 - intTuneOffset); sine_Dnmix.amplitude(1.0);
+          sine_Upmix.frequency(7700); sine_Upmix.amplitude(1.0);
+          if (::intMode == 0)
+            {
+              if ((intTuneOffset != 0) || (intFMDevPtr != 0))
+                {mixPathSel.gain(0, 0.0); mixPathSel.gain(1, 2.0819); mixPathSel.gain(2, 0.0); mixPathSel.gain(3, 0.0);}
+              else
+                {mixPathSel.gain(0, .5); mixPathSel.gain(1, 0.0); mixPathSel.gain(2, 0.0); mixPathSel.gain(3, 0.0);}
+            }
           return true;
         }
     }
@@ -1113,6 +1176,13 @@ boolean ParseSetSimParameter(String strParameter, int intMode)
             intFMDevPtr = j;
             if (fltLogs[intFMDevPtr] <.01){sine_VLF_Dnmix_Mod.amplitude(0.0);}  
             else {sine_VLF_Dnmix_Mod.amplitude(fltLogs[intFMDevPtr] * .0129870129870 );} //sets max deviation in Hz e.g. .000129870129870 * 7700  yields +/- 1 Hz peak deviation
+            if (::intMode == 0)
+              {
+                if ((intTuneOffset != 0) || (intFMDevPtr != 0))
+                  {mixPathSel.gain(0, 0.0); mixPathSel.gain(1, 2.0819); mixPathSel.gain(2, 0.0); mixPathSel.gain(3, 0.0);}
+                else
+                  {mixPathSel.gain(0, .5); mixPathSel.gain(1, 0.0); mixPathSel.gain(2, 0.0); mixPathSel.gain(3, 0.0);}
+              }
             return true;
           }
     }
@@ -1172,6 +1242,7 @@ boolean ParseSetSimParameter(String strParameter, int intMode)
     }  // Serial baud rate selection not implemented via serial port.
   return false;
 }// End ParseSetSimParameter *********************************************************************
+
 
 //*******Function to Parse and Set Busy Parameter received via Serial Port **********************
 boolean ParseSetBusyParameter(String strParameter, int intMode)
@@ -1258,7 +1329,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
   if (intMode == 7)//CH1 IN
   {
     intParam = strParameter.toInt();
-    if (( intParam >= 0) && (intParam <= 10))
+    if (( intParam >= 0) && (intParam < 9))
     {
       str1 = chrBusyModes[intMode];  str2 = "     " + String(fltLogs[intParam]); str3 = "";
       UpdateTFTModeParameter(str1, str2, str3);
@@ -1310,15 +1381,255 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
   return false;
 }// End ParseSetBusyParameter *******************************************************************
 
+
 //**** Subroutine UpdateTFTModeParameter**********************************************************
 void UpdateTFTModeParameter(String s1, String s2, String s3)
 {
-  tft.begin();
-  tft.setRotation(1);
-  tft.fillScreen(ILI9341_BLACK);
-  tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(s1);
-  tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(s2 + s3);
+  // tft.begin();
+  // tft.setRotation(3);
+  tft.setCursor(1,80);
+  tft.fillScreen(ST7735_BLACK);
+  tft.setTextColor(ST7735_CYAN);  tft.setTextSize(3);  tft.println(s1);
+  tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(s2 + s3);
 }// End UpdateTFTModeParameter *******************************************************************
+
+String StateModeToken(char *chrMode)
+{
+  String strToken = chrMode;
+  strToken.trim();
+  if (strToken.endsWith(":")) {strToken.remove(strToken.length() - 1);}
+  return strToken;
+}
+
+String SimulatorStateParameterText(int intStateMode)
+{
+  if ((intStateMode >= 0) && (intStateMode <= 4)) {return String(intTargetSN);}
+  if (intStateMode == 5) {return String(intMultipaths);}
+  if (intStateMode == 6) {return String(intFadeDepth_dB);}
+  if (intStateMode == 7) {return String(10 * fltLogs[intFadeRatePtr], 2);}
+  if (intStateMode == 8) {return String(intTuneOffset);}
+  if (intStateMode == 9) {return String(100 * fltLogs[intFMDevPtr], 2);}
+  if (intStateMode == 10) {return String(10 * fltLogs[intFMRatePtr], 2);}
+  if ((intStateMode == 11) || (intStateMode == 12)) {return String(100 * fltLogs[intGainLevel[intStateMode - 11]], 2);}
+  if ((intStateMode == 13) || (intStateMode == 14)) {return String(fltLogs[intGainLevel[intStateMode - 11]], 2);}
+  if (intStateMode == 15) {return String(intBandwidth);}
+  if (intStateMode == 16) {return String(intBaudRate[intBaudPtr]);}
+  if ((intStateMode == 17) || (intStateMode == 18)) {return String(intTestFreqHz);}
+  return "";
+}
+
+String BusyStateParameterText(int intStateMode)
+{
+  if (intStateMode == 0) {return String(intAvg);}
+  if (intStateMode == 1) {return "0";}
+  if (intStateMode == 2) {return String(intBusyBWLoHz);}
+  if (intStateMode == 3) {return String(intBusyBWHiHz);}
+  if (intStateMode == 4) {return String(intThresh);}
+  if (intStateMode == 5) {return String(intTestFreqHz);}
+  if (intStateMode == 6) {return "0";}
+  if (intStateMode == 7) {return String(intGainLevel[0]);}
+  if (intStateMode == 8) {return String(intBandwidth);}
+  if (intStateMode == 9) {return String(blnPlotSpectrum ? 1 : 0);}
+  return "";
+}
+
+boolean FeatureParameterIsNumeric(String strValue)
+{
+  strValue.trim();
+  if (strValue.length() == 0) {return false;}
+  boolean blnDigitSeen = false; boolean blnDecimalSeen = false;
+  for (unsigned int i = 0; i < strValue.length(); i++)
+    {
+      char chrValue = strValue.charAt(i);
+      if ((chrValue >= '0') && (chrValue <= '9')) {blnDigitSeen = true; continue;}
+      if (((chrValue == '+') || (chrValue == '-')) && (i == 0)) {continue;}
+      if ((chrValue == '.') && (!blnDecimalSeen)) {blnDecimalSeen = true; continue;}
+      return false;
+    }
+  return blnDigitSeen;
+}
+
+boolean SimulatorRequestConfirmed(String strRequestedParameter, int intRequestedMode)
+{
+  if (!FeatureParameterIsNumeric(strRequestedParameter)) {return false;}
+  float fltRequested = strRequestedParameter.toFloat();
+  float fltActual = SimulatorStateParameterText(intRequestedMode).toFloat();
+  boolean blnModeConfirmed = (intRequestedMode >= 5) || (intMode == intRequestedMode);
+  return blnSim && blnModeConfirmed && (abs(fltRequested - fltActual) < .001);
+}
+
+boolean BusyRequestConfirmed(String strRequestedParameter, int intRequestedMode)
+{
+  if (!FeatureParameterIsNumeric(strRequestedParameter)) {return false;}
+  float fltRequested = strRequestedParameter.toFloat();
+  float fltActual = BusyStateParameterText(intRequestedMode).toFloat();
+  return (!blnSim) && (intBusyMode == intRequestedMode) && (abs(fltRequested - fltActual) < .001);
+}
+
+long DSPDisplayValue()
+{
+  if (blnSim)
+    {
+      if ((intMode >= 0) && (intMode <= 4)) {return intTargetSN;}
+      if (intMode == 5) {return intMultipaths;}
+      if (intMode == 6) {return intFadeDepth_dB;}
+      if (intMode == 7) {return round(10000 * fltLogs[intFadeRatePtr]);}
+      if (intMode == 8) {return intTuneOffset;}
+      if (intMode == 9) {return round(100000 * fltLogs[intFMDevPtr]);}
+      if (intMode == 10) {return round(10000 * fltLogs[intFMRatePtr]);}
+      if ((intMode == 11) || (intMode == 12)) {return round(100000 * fltLogs[intGainLevel[intMode - 11]]);}
+      if ((intMode == 13) || (intMode == 14)) {return round(1000 * fltLogs[intGainLevel[intMode - 11]]);}
+      if (intMode == 15) {return intBandwidth;}
+      if (intMode == 16) {return intBaudRate[intBaudPtr];}
+      if ((intMode == 17) || (intMode == 18)) {return intTestFreqHz;}
+      return 0;
+    }
+  if (intBusyMode == 0) {return intAvg;}
+  if (intBusyMode == 1) {return blnEnbBusyDetect ? 1 : 0;}
+  if (intBusyMode == 2) {return intBusyBWLoHz;}
+  if (intBusyMode == 3) {return intBusyBWHiHz;}
+  if (intBusyMode == 4) {return intThresh;}
+  if (intBusyMode == 5) {return intTestFreqHz;}
+  if (intBusyMode == 6) {return blnEnableTestTone ? 1 : 0;}
+  if (intBusyMode == 7) {return intGainLevel[0];}
+  if (intBusyMode == 8) {return intBandwidth;}
+  if (intBusyMode == 9) {return blnPlotSpectrum ? 1 : 0;}
+  return 0;
+}
+
+void RenderDSPStateToTFT()
+{
+  String str1; String str2; String str3;
+  if (blnSim)
+    {
+      if ((intMode < 0) || (intMode > 16)) {return;}
+      str1 = chrModes[intMode];
+      if (intMode <= 4) {str2 = "    S:N= " + String(intTargetSN); str3 = " dB";}
+      else if (intMode == 5) {str2 = "    " + String(intMultipaths);}
+      else if (intMode == 6) {str2 = "    " + String(intFadeDepth_dB); str3 = " dB";}
+      else if (intMode == 7) {str2 = "    " + String(10 * fltLogs[intFadeRatePtr]); str3 = " Hz";}
+      else if (intMode == 8) {str2 = "    " + String(intTuneOffset); str3 = " Hz";}
+      else if (intMode == 9) {str2 = "    " + String(100 * fltLogs[intFMDevPtr]); str3 = " Hz";}
+      else if (intMode == 10) {str2 = "    " + String(10 * fltLogs[intFMRatePtr]); str3 = " Hz";}
+      else if ((intMode == 11) || (intMode == 12)) {str2 = "    " + String(100 * fltLogs[intGainLevel[intMode - 11]]);}
+      else if ((intMode == 13) || (intMode == 14)) {str2 = "    " + String(fltLogs[intGainLevel[intMode - 11]]);}
+      else if (intMode == 15) {str2 = "    " + String(intBandwidth); str3 = " Hz";}
+      else if (intMode == 16) {str2 = "    " + String(intBaudRate[intBaudPtr]); str3 = " Baud";}
+    }
+  else
+    {
+      if ((intBusyMode < 0) || (intBusyMode > 9)) {return;}
+      str1 = chrBusyModes[intBusyMode];
+      if (intBusyMode == 0) {str2 = "    AVG= " + String(intAvg);}
+      else if (intBusyMode == 1) {str2 = "";}
+      else if (intBusyMode == 2) {str2 = "    " + String(intBusyBWLoHz); str3 = " Hz";}
+      else if (intBusyMode == 3) {str2 = "    " + String(intBusyBWHiHz); str3 = " Hz";}
+      else if (intBusyMode == 4) {str2 = "    " + String(intThresh); str3 = " dB";}
+      else if (intBusyMode == 5) {str2 = "    " + String(intTestFreqHz); str3 = " Hz";}
+      else if (intBusyMode == 6) {str2 = "";}
+      else if (intBusyMode == 7) {str2 = "    " + String(fltLogs[intGainLevel[0]]);}
+      else if (intBusyMode == 8) {str2 = "    " + String(intBandwidth); str3 = " Hz";}
+      else if (intBusyMode == 9) {str2 = blnPlotSpectrum ? "    ON" : "    OFF";}
+    }
+  UpdateTFTModeParameter(str1, str2, str3);
+}
+
+void DisplayWatchdog(boolean blnForce)
+{
+  if (blnTFTMirrorDrawing || blnPlotSpectrum || (blnSim && (blnTestMode3K || blnTestMode6K))) {return;}
+  unsigned long ulngNow = millis();
+  if ((!blnForce) && ((ulngNow - ulngLastTFTWatchdogMs) < 250)) {return;}
+  ulngLastTFTWatchdogMs = ulngNow;
+  int intExpectedMode = blnSim ? intMode : intBusyMode;
+  long lngExpectedValue = DSPDisplayValue();
+  boolean blnPeriodicRefresh = (ulngNow - ulngLastTFTRefreshMs) >= 30000;
+  boolean blnStateChanged = (!blnTFTStateValid) || (blnTFTStateSim != blnSim) ||
+                            (intTFTStateMode != intExpectedMode) || (lngTFTStateValue != lngExpectedValue);
+  if (blnForce || blnPeriodicRefresh || blnStateChanged)
+    {
+      blnTFTMirrorDrawing = true;
+      RenderDSPStateToTFT();
+      blnTFTStateValid = true; blnTFTStateSim = blnSim;
+      intTFTStateMode = intExpectedMode; lngTFTStateValue = lngExpectedValue;
+      ulngLastTFTRefreshMs = ulngNow;
+      blnTFTMirrorDrawing = false;
+    }
+}
+
+void PrintDSPStateAck(boolean blnConfirmed)
+{
+  Serial.print("ACK ");
+  if (blnSim)
+    {
+      Serial.print(StateModeToken(chrModes[intMode])); Serial.print(":"); Serial.print(SimulatorStateParameterText(intMode));
+    }
+  else
+    {
+      Serial.print("BUSY/"); Serial.print(StateModeToken(chrBusyModes[intBusyMode]));
+      Serial.print(":"); Serial.print(BusyStateParameterText(intBusyMode));
+    }
+  Serial.print(" GEN="); Serial.print(ulngAppliedGeneration);
+  Serial.println(blnConfirmed ? " OK" : " ERROR");
+}
+
+void PrintLevelFields()
+{
+  Serial.print(" INPUT_MVPP="); Serial.print(fltppLPInputMeasAvg, 1);
+  Serial.print(" LEFT_OUT_MVPP="); Serial.print(fltppAmpLeftOutAvg, 1);
+  Serial.print(" RIGHT_OUT_MVPP="); Serial.print(fltppAmpRightOutAvg, 1);
+}
+
+void PrintStatus()
+{
+  Serial.print("STATUS MODE=");
+  if (blnSim) {Serial.print(StateModeToken(chrModes[intMode])); Serial.print(" S:N_DB="); Serial.print(intTargetSN);}
+  else {Serial.print("BUSY"); Serial.print(" S:N_DB="); Serial.print(intDetectSN);}
+  Serial.print(" REV=" HFSIM_FIRMWARE_REVISION);
+  Serial.print(" DEBUG="); Serial.print(blnDebugAdjustSN ? "ON" : "OFF");
+  Serial.print(" MULTIPATHS="); Serial.print(intMultipaths);
+  Serial.print(" FADE_DEPTH_DB="); Serial.print(intFadeDepth_dB);
+  Serial.print(" FADE_RATE_HZ="); Serial.print(fltFadeRate, 2);
+  Serial.print(" OFFSET_HZ="); Serial.print(intTuneOffset);
+  Serial.print(" CH1_IN_GAIN="); Serial.print(100 * fltLogs[intGainLevel[0]], 2);
+  Serial.print(" CH2_IN_GAIN="); Serial.print(100 * fltLogs[intGainLevel[1]], 2);
+  Serial.print(" CH1_OUT_GAIN="); Serial.print(fltLogs[intGainLevel[2]], 2);
+  Serial.print(" CH2_OUT_GAIN="); Serial.print(fltLogs[intGainLevel[3]], 2);
+  Serial.print(" BANDWIDTH_HZ="); Serial.print(intBandwidth);
+  Serial.print(" GEN="); Serial.print(ulngAppliedGeneration);
+  PrintLevelFields();
+  Serial.print(" BUILD="); Serial.println(chrBuildIdentity);
+}
+
+void PrintLevel()
+{
+  Serial.print("LEVEL"); PrintLevelFields(); Serial.println();
+}
+
+void PrintHelp()
+{
+  Serial.println(F("HELP IONOS SIM Rev " HFSIM_FIRMWARE_REVISION));
+  Serial.println(F("SIM: WGN|MPG|MPM|MPP|MPD:<S:N -40..40 dB>"));
+  Serial.println(F("SIM: MULTIPATHS:<2|4>"));
+  Serial.println(F("SIM: FADE DEPTH:<0..40 dB>"));
+  Serial.println(F("SIM: FADE FREQ:<0|0.1|0.2|0.5|1|2|5|10|20 Hz>"));
+  Serial.println(F("SIM: OFFSET:<-200..200 Hz>"));
+  Serial.println(F("SIM: FM DEVIATION:<0|1|2|5|10|20|50|100|200 Hz>"));
+  Serial.println(F("SIM: FM RATE:<0|0.1|0.2|0.5|1|2|5|10|20 Hz>"));
+  Serial.println(F("SIM: CH1 IN|CH2 IN:<0|1|2|5|10|20|50|100|200>"));
+  Serial.println(F("SIM: CH1 OUT|CH2 OUT:<0|0.01|0.02|0.05|0.1|0.2|0.5|1|2>"));
+  Serial.println(F("SIM: BANDWIDTH:<3000|6000 Hz> | BUSY"));
+  Serial.println(F("BUSY: ENB BUSY:<1..50> | DIS BUSY:0 | LOW:<43..5000> | HIGH:<500..6000>"));
+  Serial.println(F("BUSY: THRESH:<3..40> | TONE ON:<43..6300> | TONE OFF:0"));
+  Serial.println(F("BUSY: CH1 IN:<index 0..8> | BANDWIDTH:<3000|6000> | SPECTRUM:<0|1> | SIM"));
+  Serial.println(F("QUERY: STATUS | LEVEL | HELP"));
+  Serial.println(F("MAINTENANCE: CODECINIT | RESET"));
+  Serial.println(F("DIAGNOSTIC: DEBUG ON | DEBUG OFF"));
+  Serial.println(F("STATUS: live DSP settings, levels, applied generation, and build identity"));
+  Serial.println(F("REPLY: OK or ? followed by ACK <DSP-state> GEN=<n> OK|ERROR"));
+  Serial.println(F("END HELP"));
+}
+
+
 
 // **** Subroutine to  AvgerageFFTBins *********************************************************
 void AvgFFTBins(boolean blnInit, float fltKavg, int intLoFHz, int intHiFHz)
@@ -1364,6 +1675,7 @@ void AvgFFTBins(boolean blnInit, float fltKavg, int intLoFHz, int intHiFHz)
   }
 }/// End Sub AvgFFTBins ******************************************************************************
 
+
 //******** Sub SearchRatioDetect*************Used in Busy detector ************************************
 //Status: Works well for both narrow and wide  band signal detection...Still optimizing********
 int SearchRatioDetect(int intLowFHz, int intHiFHz, int intSearchWidthHz, int intThreshdB)
@@ -1406,6 +1718,7 @@ int SearchRatioDetect(int intLowFHz, int intHiFHz, int intSearchWidthHz, int int
     return intMaxS_NdB;
   }
 
+
   // Generate the Numerator and Denominator normalized to per bin for the Lowest S:N
   fltDenom = (fltHi_LowSum - fltSearchSumMin) / ((intHiBin - intLowBin) - intSearchWidthBins); //Avg energy/bin  outside region of max
   fltNum = fltSearchSumMin / intSearchWidthBins; //Minimum Energy per bin over intSearchWidthHz between intLowBin and intHighBin
@@ -1422,7 +1735,8 @@ int SearchRatioDetect(int intLowFHz, int intHiFHz, int intSearchWidthHz, int int
     return 0;
   }
   else return intMaxS_NdB;
-}//End************* SearchRatioDetect *********************************************************
+} // End************* SearchRatioDetect *********************************************************
+
 
 // Subroutine to Save ParametersToEEProm *******************************************************************
 void SaveParametersToEEPROM()
@@ -1471,6 +1785,7 @@ void SaveParametersToEEPROM()
   blnInitializedFromEEPROM = true; return;
 }  //  End SaveParametersToEEPROM ***********************************************************************
 
+
 // ******* Subroutine to InitializeParametersFromEEProm **************************************************
 void InitializeParametersFromEEPROM()
 { // Only called from Setup upon initial power on or Reset
@@ -1494,47 +1809,73 @@ void InitializeParametersFromEEPROM()
     else if ((i == 12) && (bytParameter <7))  {intBaudPtr =  int(bytParameter);}
    }
   //Serial.println("Init from EEPROM Complete");
-  blnInitializedFromEEPROM = true; return;
+  blnInitializedFromEEPROM = true; 
+  return;
 }  //  End InitializeParametersFromEEPROM ****************************************************************
 
-//********Subroutine Setup *********************************************************************************
+void ReinitCodec()
+{
+  sgtl5000_1.enable(); sgtl5000_1.volume(.2);
+}
+
+// *******************************************************************************
+// *******************************************************************************
+// ******** Subroutine Setup *****************************************************
 void setup()
 {
-  pinMode(ENC1Button, INPUT_PULLUP);   //#define ENC1Button 1
-  debouncer1.attach(ENC1Button);//Right Encoder button
+  
+  pinMode(ENC1Button, INPUT_PULLUP);    //#define ENC1Button 1
+  debouncer1.attach(ENC1Button);        //Right Encoder button
   debouncer1.interval(10);
-  pinMode(ENC2Button, INPUT_PULLUP);   //#define ENC1Button 2
-  debouncer2.attach(ENC2Button);// Left Encoder Button1
+
+  pinMode(ENC2Button, INPUT_PULLUP);    //#define ENC1Button 2
+  debouncer2.attach(ENC2Button);        // Left Encoder Button1
   debouncer2.interval(10);
-  Serial.end(); Serial.begin(intBaudRate[intBaudPtr]);
 
 // Pins for Rotary Encoders RE1(modes) and RE2(parameters)
-  pinMode(0, INPUT_PULLUP);//RENC1a
-  pinMode(1, INPUT_PULLUP);//RENC1b
-  pinMode(3, INPUT_PULLUP);//RENC2a
-  pinMode(4, INPUT_PULLUP);//RENC2b
+  pinMode(ENC1A_Pin, INPUT_PULLUP); //RENC1a
+  pinMode(ENC1B_Pin, INPUT_PULLUP); //RENC1b
+  pinMode(ENC2A_Pin, INPUT_PULLUP); //RENC2a
+  pinMode(ENC2B_Pin, INPUT_PULLUP); //RENC2b
+
+  Serial.end(); 
+  Serial.begin(intBaudRate[intBaudPtr]);
+  while (!Serial){}; 
+
   sgtl5000_1.enable(); sgtl5000_1.volume(.2); // keep volume low for headphones
   AudioMemory(50);
-  delayI.delay(7,11.3605); //set unused tap #7 1 ms longer than needed 1.3605 + 10)  to keep from dynamically re allocating memory
-  delayQ.delay(7,9.0);//set unused tap #7 1 ms longer than needed 1 + 8)  to keep from dynamically allocating memory
-  whiteOut.amplitude(.6452); //Set white noise level to yield ~235mv rms (3KHz bandwidth) or ~313mv rms (6KHz bandwidth)
-  fft1024.windowFunction(AudioWindowHanning1024); // FFT Testing Default Window is Hanning
- 
-  tft.begin();
-  tft.setRotation(1);
-  tft.fillScreen(ILI9341_BLACK);
-  tft.setTextColor(ILI9341_WHITE);  tft.setTextSize(4);  tft.println("IONOS SIM      ");
-  tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(strRevision);
+  delayI.delay(7,11.3605);    //set unused tap #7 1 ms longer than needed 1.3605 + 10)  to keep from dynamically re allocating memory
+  delayQ.delay(7,9.0);        //set unused tap #7 1 ms longer than needed 1 + 8)  to keep from dynamically allocating memory
+  whiteOut.amplitude(.6452);  //Set white noise level to yield ~235mv rms (3KHz bandwidth) or ~313mv rms (6KHz bandwidth)
+  fft1024.windowFunction(AudioWindowHanning1024);   // FFT Testing Default Window is Hanning
+
+
+  // Setup the TFT LCD screen
+  tft.init(320, 480);
+  tft.invertDisplay(true);                // This LCD requires colors to be inverted
+  tft.setRotation(TFT_Screen_Rotate);     // Rotates screen to match the baseboard orientation (-->3)
+
+  //tft.fillScreen(ST7735_BLUE);  // Fill screen with blue
+  tft.setCursor(1, 120);          // Set initial cursor position
+  tft.fillScreen(ST7735_BLACK);
+  tft.setTextColor(ST7735_WHITE);  tft.setTextSize(4);  tft.println("IONOS SIM      ");
+  tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(strRevision);
+
   //this prints out a 8 digit hex SN unique to the Specific teensy  
-  tft.setTextColor(ILI9341_MAGENTA);tft.setCursor(0,180);tft.print(" Serial: "); tft.printf("%08X",OCOTP_CFG0);
+  tft.setTextColor(ST7735_MAGENTA);tft.setCursor(0,180);tft.print(" Serial: "); tft.printf("%08X",OCOTP_CFG0);
+  tft.setTextColor(ST7735_YELLOW); tft.setTextSize(1); tft.setCursor(0,220); tft.println(chrBuildIdentity);
   delay(4000);
-  Serial.print("IONOS SIM ");Serial.print(strRevision); Serial.print(" Serial: ");Serial.printf("%08X",OCOTP_CFG0);Serial.println("");
+
+  Serial.print("IONOS SIM ");Serial.print(strRevision); Serial.print(" Serial: ");Serial.printf("%08X",OCOTP_CFG0);
+  Serial.print(" Build: "); Serial.println(chrBuildIdentity);
+
   //This sets up all non static variables as the would be upon power on to eanble clean startup from SIM: command
   strMode = ""; strParameter= "";
   
   blnSim = true;  blnInitialized = false; blnEnableTestTone = false; blnPlotSpectrum = false; blnInitSpectrum = false; 
   blnModes = true; blnInitModes = true; blnColon = false;  blnChanBusySent = false;  blnChanClearSent = false; blnPlotBusyRed = false;  blnEnbBusyDetect = false;
   blnTestMode3K = false; blnTestMode6K = false; blnInitializedFromEEPROM = false;
+  blnTFTStateValid = false; ulngLastTFTWatchdogMs = 0; ulngLastTFTRefreshMs = 0;
 
   ulngLastSpectrumUpdateMs = millis(); 
 
@@ -1548,10 +1889,13 @@ void setup()
   fltVLF_UpFreq = 100; fltVLF_Amp = 0; fltFadeRate = 0;  
     fltPeakSum = 0; fltNoiseSum = 0; fltMax = 0; fltAvg = 0; fltAvgBinsOfInt = 0.0;
   fltppi2s0InAvg = 0.0; fltppi2s1InAvg = 0.0; fltppAmpRightOutAvg = 0.0; fltppAmpLeftOutAvg = 0.0;
+
 // End of basic initialization.
+
  InitializeParametersFromEEPROM();delay(1000);
-  SetFilterBandwidth(intBandwidth);
+ SetFilterBandwidth(intBandwidth);
  whiteOut.amplitude(.6452); //Set white noise level to yield 150 mv rms
+
 // Initialize the tap coefficients for the 119 tap Hilbert Filter 
   for (int i = 0; i < 120; i ++) // for 120 taps including forced 0 end tap to make number of taps even 
     {  // Reverse order of coefficients for Teensy FIR (put negative values first) FIR will reverse order
@@ -1567,22 +1911,29 @@ void setup()
   filHP7500FIR.begin(sht7500HzHPCoef, 120); // LP Downmix already set
   sine_VLF_Dnmix_Mod.amplitude(0);sine_Upmix.frequency(7700); sine_Upmix.amplitude(1.0);
   sine_Dnmix.frequency(7700.0- intTuneOffset);sine_Dnmix.amplitude(1.0);
+  fltFadeRate = 10 * fltLogs[intFadeRatePtr];
+  sine_VLF_Dnmix_Mod.frequency(10 * fltLogs[intFMRatePtr]);
+  if ((intFMRatePtr == 0) || (intFMDevPtr == 0)) {sine_VLF_Dnmix_Mod.amplitude(0.0);}
+  else {sine_VLF_Dnmix_Mod.amplitude(fltLogs[intFMDevPtr] * .0129870129870);}
   ampRightOut.gain(fltLogs[intGainLevel[3]]); ampLeftOut.gain(fltLogs[intGainLevel[2]]);// default gain (half scale)[range = 0 to 2]
   SetIQTapDelays(intMode);
   mixInpSel.gain(0, 0); mixInpSel.gain(1, 0); mixInpSel.gain(2, 100 * fltLogs[intGainLevel[0]]); mixInpSel.gain(3, 100 * fltLogs[intGainLevel[1]]);
   ulngCurrentElapsedTimeUs = micros(); ulngLastDelayUpdateUs = ulngCurrentElapsedTimeUs; ulngLastPPAvgTimeUs = ulngCurrentElapsedTimeUs;
+
  // mixI2Q2.gain(0, .5); mixI2Q2.gain(1, .5); mixI2Q2.gain(2, 0.0); mixI2Q2.gain(3, 0.0);// Set gains for IQ power mixer
   
   } // End Subroutine Setup ***********************************************************************************
 
+
 // InitializeBusy *******************************************************************************************
 void InitializeBusy()
 {
-  tft.begin();
-  tft.fillScreen(ILI9341_BLACK);
-  tft.setRotation(1);
-  tft.setTextColor(ILI9341_WHITE);  tft.setTextSize(4);  tft.println("BUSY DETECT  ");
-  tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(strRevision);
+  // tft.begin();
+  tft.fillScreen(ST7735_BLACK);
+  //tft.setRotation(3);
+  tft.setCursor(1,80);
+  tft.setTextColor(ST7735_WHITE);  tft.setTextSize(4);  tft.println("BUSY DETECT  ");
+  tft.setTextColor(ST7735_CYAN);  tft.setTextSize(3);  tft.println(strRevision);
   ampRightOut.gain(fltLogs[intGainLevel[3]]); 
   delay(1000);
   fltCurrentDelayI1Ms = fltMinimumIDelayMs; 
@@ -1597,12 +1948,16 @@ void InitializeBusy()
 
 } //End InitializeBusy ****************************************************************************************
 
-//   Main Loop***********************************************************************************************
+
+// *******************************************************************************
+// *******************************************************************************
+//   Main Loop*******************************************************************
 void loop()
 {
+  
    String str1, str2, str3;
   //Code to update Rotary Encoder 2 (modes)
-  lngENC2New = ENC2.read();//Encoder 2 controls Modes (Left hand knob)
+  lngENC2New = ENC2.read();   //Encoder 2 controls Modes (Left hand knob)
   
   if ((lngENC2Old != lngENC2New) || (! blnInitialized))
     {
@@ -1611,7 +1966,8 @@ void loop()
           intMode = intMode + (lngENC2New - lngENC2Old);
           if (intMode > 18) {intMode = 18;} //Hold at limit
           if (intMode < 0 ){intMode = 0;}
-          if (intMode < 17)
+          if (intMode <= 4) {ApplyChannelMode(intMode);}
+          else if (intMode < 17)
             {
               blnTestMode3K = false; blnTestMode6K = false;  blnEnableTestTone = false;
               InputTestWaveform.amplitude(0);
@@ -1636,16 +1992,12 @@ void loop()
                   blnModes = true;
                 }
               }
-          if ((intMode >= 1) && (intMode <= 4))
-            {
-             SetIQTapDelays(intMode);
-              blnModes = true; 
-            }
         }
-      tft.begin();
-      tft.setRotation(1);
-      tft.fillScreen(ILI9341_BLACK);
-      if ((intMode == 0) || (! blnInitialized))//WGN
+      // tft.begin();
+      //tft.setRotation(3);
+      tft.setCursor(1,80);
+      tft.fillScreen(ST7735_BLACK);
+      if ((intMode == 0) || (! blnInitialized)) //WGN
         {
           intCountrmsMixIQ1234Out = 0;
           SetIQTapDelays(intMode);
@@ -1653,8 +2005,8 @@ void loop()
           mixIQ1234.gain(0, 1.0); mixIQ1234.gain(1, 0.0); mixIQ1234.gain(2, 0.0);mixIQ1234.gain(3, 0.0);
           //Serial.print("Line 1504: intMode = ");Serial.println(intMode);
           str1 = chrModes[intMode];  str2 = "    S:N= "; str3 = " dB";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTargetSN + str3);
+          tft.setTextColor(ST7735_CYAN);  tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTargetSN + str3);
         }
       if ((intMode > 0) && (intMode <= 4))//MPG,MPM,MPP,MPD
         {
@@ -1670,71 +2022,72 @@ void loop()
             }  
           Serial.print("Line 1651: intMode = ");Serial.println(intMode);
           str1 = chrModes[intMode];  str2 = "    S:N= "; str3 = " dB";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTargetSN + str3);
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTargetSN + str3);
           if (( intTuneOffset != 0) || (intFMDevPtr !=0))
             {
-              tft.setTextColor(ILI9341_YELLOW);  tft.setTextSize(2);  tft.println("    (no FM or Offset!)");
+              tft.setTextColor(ST7735_YELLOW);  tft.setTextSize(2);  tft.println("    (no FM or Offset!)");
             }
         }
       if (intMode == 5)//MULTIPATHS
         {
           str1 = chrModes[intMode];  str2 = "    "; str3 = "";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intMultipaths);
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intMultipaths);
         }
       if (intMode == 6) //FADE Depth
         {
           str1 = chrModes[intMode];  str2 = "    "; str3 = " dB";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intFadeDepth_dB + str3);
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intFadeDepth_dB + str3);
         }
       if (intMode == 7) // FADE Freq
         {
           str1 = chrModes[intMode];  str2 = "    "; str3 = " Hz";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(10 * fltLogs[intFadeRatePtr]) + str3);
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(10 * fltLogs[intFadeRatePtr]) + str3);
         }
       if (intMode == 8) //Offset
         {
           str1 = chrModes[intMode];  str2 = "    "; str3 = " Hz";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTuneOffset + str3);
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTuneOffset + str3);
         }
       if (intMode == 9) //FM Deviation
         {
           str1 = chrModes[intMode];  str2 = "    "; str3 = " Hz";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(100 * fltLogs[intFMDevPtr]) + str3);
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(100 * fltLogs[intFMDevPtr]) + str3);
         }
       if (intMode == 10) //FM Rate
         {
           str1 = chrModes[intMode];  str2 = "    "; str3 = " Hz";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(10 * fltLogs[intFMRatePtr]) + str3);
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(10 * fltLogs[intFMRatePtr]) + str3);
         }
 
       if ((intMode >= 11) && (intMode < 15)) //Ch1, Ch2, IN;Out
         {
           str1 = chrModes[intMode];  str2 = "    ";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3); 
-          if (intMode < 13) {tft.println(str2 +String(100 * fltLogs[intGainLevel[ intMode - 11]]));}// Scale up input fltLogs by 100}
-          else {tft.println(str2 +String( fltLogs[intGainLevel[ intMode - 11]]));}// Scale output fltLogs by 1
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3); 
+
+          if (intMode < 13) {tft.println(str2 +String(100 * fltLogs[intGainLevel[ intMode - 11]]));}  // Scale up input fltLogs by 100}
+          else {tft.println(str2 +String( fltLogs[intGainLevel[ intMode - 11]]));}                    // Scale output fltLogs by 1
         }
 
       if (intMode == 15)//BANDWIDTH
         {
           str1 = chrModes[intMode];  str2 = "    "; str3 = " Hz";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intBandwidth + str3);
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intBandwidth + str3);
         }
 
       if (intMode == 16)//Baud Rate
         {
           str1 = chrModes[intMode];  str2 = "    "; str3 = " Baud";
-          tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-          tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intBaudRate[intBaudPtr] + str3);  
+          tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+          tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intBaudRate[intBaudPtr] + str3);  
           Serial.end(); Serial.begin(intBaudRate[intBaudPtr]);
         }  
       if (intMode == 17)//TEST3K
@@ -1774,9 +2127,10 @@ void loop()
       blnInitModes = false; blnInitSpectrum  = true;
       if (blnSim)// code for SIM
         {
-          tft.begin();
-          tft.setRotation(1);
-          tft.fillScreen(ILI9341_BLACK);
+          // tft.begin();
+          //tft.setRotation(3);
+          tft.setCursor(1,80);
+          tft.fillScreen(ST7735_BLACK);
           if ((intMode >= 0) && (intMode <= 4))
             {
               if (intMode == 0) //(WGN)
@@ -1799,8 +2153,8 @@ void loop()
                   intTargetSN = intMinSN;
                 }
               str1 = chrModes[intMode];  str2 = "    S:N= "; str3 = " dB";
-              tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-              tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTargetSN + str3);
+              tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+              tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTargetSN + str3);
             }
           if (intMode == 5)//MULTIPATHS
             {
@@ -1818,8 +2172,8 @@ void loop()
                  }
               Serial.print("Line 1799: intMultipaths ="); Serial.println(intMultipaths);
               str1 = chrModes[intMode]; str2 = "    " ; 
-              tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3); tft.println(str1);
-              tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intMultipaths);
+              tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3); tft.println(str1);
+              tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intMultipaths);
              
             }
           if (intMode == 6)//FADE DEPTH
@@ -1831,8 +2185,8 @@ void loop()
                 }
               if (intFadeDepth_dB < 0) {intFadeDepth_dB = 0;}
               str1 = chrModes[intMode];   str2 = "    ";  str3 = " dB";
-              tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-              tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intFadeDepth_dB + str3);
+              tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+              tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intFadeDepth_dB + str3);
             }
           if (intMode == 7)//FADE FREQ
             {
@@ -1841,8 +2195,8 @@ void loop()
               if  (intFadeRatePtr < 0) {intFadeRatePtr = 0;}
               fltFadeRate = 10 * fltLogs[intFadeRatePtr];// Range 0, .1 to 20 [Log]
               str1 = chrModes[intMode]; str2 = "    " ; str3 = " Hz";
-              tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-              tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(fltFadeRate)  + str3);
+              tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+              tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(fltFadeRate)  + str3);
             }
           if (intMode == 8)//OFFSET
             {
@@ -1851,8 +2205,8 @@ void loop()
               if (intTuneOffset < intMinOffset) {intTuneOffset = intMinOffset;}
               sine_VLF_Dnmix_Mod.amplitude(0);sine_Dnmix.frequency(7700 - intTuneOffset); sine_Dnmix.amplitude(1.0); sine_Upmix.frequency(7700); sine_Upmix.amplitude(1.0);
               str1 = chrModes[intMode]; str2 = "    " ; str3 = " Hz";
-              tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-              tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTuneOffset + str3);
+              tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+              tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intTuneOffset + str3);
             }
           if (intMode == 9) //FM DEVIATION
             {
@@ -1862,8 +2216,8 @@ void loop()
               if (fltLogs[intFMDevPtr] <.01){sine_VLF_Dnmix_Mod.amplitude(0.0);}  
               else {sine_VLF_Dnmix_Mod.amplitude(fltLogs[intFMDevPtr] * .0129870129870 );} //sets max deviation in Hz e.g. .000129870129870 * 7700  yields +/- 1 Hz peak deviation
               str1 = chrModes[intMode]; str2 = "    " ; str3 = " Hz";
-              tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-              tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(100 * fltLogs[intFMDevPtr]) + str3);
+              tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+              tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(100 * fltLogs[intFMDevPtr]) + str3);
             }
         if (intMode == 10)//FM RATE
           {
@@ -1877,16 +2231,16 @@ void loop()
                 sine_VLF_Dnmix_Mod.frequency(10 * fltLogs[intFMRatePtr]);// Rate is .1 to 20 Hz
               }
             str1 = chrModes[intMode]; str2 = "    " ; str3 = " Hz";
-            tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-            tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(10 * fltLogs[intFMRatePtr]) + str3);
+            tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+            tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(10 * fltLogs[intFMRatePtr]) + str3);
           }
         if ((intMode > 10) && (intMode < 13)) //Input GAINS: (0,1,2,5,10,20,50,100,200)[Nominal input range for 1000 mv p-p internal: 5 mv p-p to 1000 mv p-p]
           {
             intGainLevel[intMode - 11] = intGainLevel[intMode - 11] + (lngENC1New - lngENC1Old);
             if (intGainLevel[intMode - 11] > 8) { intGainLevel[intMode - 11] = 8;} //Hold at stops
             if (intGainLevel[intMode - 11] < 0 ) {intGainLevel[intMode - 11] = 0;}
-            str1 = chrModes[intMode]; str2 = "    "; tft.setTextColor(ILI9341_CYAN);tft.setTextSize(3); tft.println(str1);
-            tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3);
+            str1 = chrModes[intMode]; str2 = "    "; tft.setTextColor(ST7735_CYAN);tft.setTextSize(3); tft.println(str1);
+            tft.setTextColor(ST7735_GREEN); tft.setTextSize(3);
             tft.println(str2 +String(100 * fltLogs[intGainLevel[ intMode - 11]]));// Scale up fltLogs by 100 
             mixInpSel.gain((intMode - 9), (100 * fltLogs[intGainLevel[intMode - 11]])); //sets input mixer gain (0-100 (log))
             
@@ -1899,8 +2253,8 @@ void loop()
             if (intMode == 13){ampLeftOut.gain(fltLogs[ intGainLevel[intMode - 11]]); }//sets ampLeftOut gain (0-2) (log))
             if (intMode == 14){ampRightOut.gain(fltLogs[ intGainLevel[intMode - 11]]); }//sets ampRightOut gain (0-2) (log)) 
             str1 = chrModes[intMode]; str2 = "    " ;
-            tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3); tft.println(str1);
-            tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(fltLogs[intGainLevel[intMode - 11]]));
+            tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3); tft.println(str1);
+            tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(fltLogs[intGainLevel[intMode - 11]]));
           }   
              
         if (intMode == 15)//BANDWIDTH
@@ -1908,8 +2262,8 @@ void loop()
             if ((lngENC1New - lngENC1Old) >0){intBandwidth = 6000;}
             if ((lngENC1New - lngENC1Old) <0){intBandwidth = 3000;}
             str1 = chrModes[intMode]; str2 = "    " ; str3 = " Hz";
-            tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3); tft.println(str1);
-            tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + intBandwidth + str3);
+            tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3); tft.println(str1);
+            tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intBandwidth + str3);
             SetFilterBandwidth(intBandwidth);// Sets filters and parameters for correct bandwidth 3000 or 6000 Hz
           }
         if (intMode == 16)//SERIAL
@@ -1919,8 +2273,8 @@ void loop()
             if (intBaudPtr < 0) {intBaudPtr = 0;}
             
             str1 = chrModes[intMode]; str2 = "    " ; str3 = " Baud";
-            tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(str1);
-            tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(intBaudRate[intBaudPtr]) + str3);
+            tft.setTextColor(ST7735_CYAN);   tft.setTextSize(3);  tft.println(str1);
+            tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + String(intBaudRate[intBaudPtr]) + str3);
             Serial.end(); Serial.begin(intBaudRate[intBaudPtr]); 
           } 
           
@@ -1929,7 +2283,7 @@ void loop()
             SetFilterBandwidth(3000);
             intTestFreqHz = intTestFreqHz + 100 * (lngENC1New - lngENC1Old); //Inc/Dec by 100 Hz per click
             if (intTestFreqHz > 3300) {intTestFreqHz = 3300; }//Hold at stops
-            if (intTestFreqHz < 300) { intTestFreqHz = 300;} //Hold at 86 Hz. Lower limit is ~40 Hz at -.5dB (-1.5 dB @10 Hz)  with 10 uf Caps.
+            if (intTestFreqHz < 300) { intTestFreqHz = 300;} //Hold at 300 Hz. Lower limit is ~40 Hz at -.5dB (-1.5 dB @10 Hz) with 10 uf Caps.
             intBandwidth = 3000; intTuneOffset = 0;
             InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
             mixInpSel.gain(0, 2); mixInpSel.gain(1, 0); mixInpSel.gain(2, 0); mixInpSel.gain(3, 0);
@@ -1943,9 +2297,7 @@ void loop()
             intBandwidth = 6000; intTuneOffset = 0;
             InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
             mixInpSel.gain(0, 2); mixInpSel.gain(1, 0); mixInpSel.gain(2, 0); mixInpSel.gain(3, 0);
-          }
-         
-          
+          }     
         lngENC1Old = lngENC1New;
       }
     else
@@ -2053,12 +2405,12 @@ void loop()
           blnDisplayLvl= (millis() - ulngLastLevelDisplayMs )  > 200; 
           if ((intMode <5)&&(!blnPlotSpectrum) && blnDisplayLvl)
             {
-              tft.setCursor(0,140); tft.setTextColor(ILI9341_BLACK);  tft.setTextSize(3);  tft.println(strLastLevel);
-              tft.setCursor(0,180); tft.setTextColor(ILI9341_BLACK);  tft.setTextSize(2);  tft.println(strLastCF);
+              tft.setCursor(0,140); tft.setTextColor(ST7735_BLACK);  tft.setTextSize(3);  tft.println(strLastLevel);
+              tft.setCursor(0,180); tft.setTextColor(ST7735_BLACK);  tft.setTextSize(2);  tft.println(strLastCF);
               str1 = "   Lvl=";  str2 =  String(int(fltppInputForDisplay));str3 = " mvp-p"; strLastLevel = str1 + str2 + str3;
               if ((199 < fltppInputForDisplay)&&(fltppInputForDisplay < 1200) &&(fltppMixIQOut <1800) )//"Green" range 
-                {tft.setCursor(0,140); tft.setTextColor(ILI9341_GREEN);  tft.setTextSize(3);  tft.println(strLastLevel);}
-              else{tft.setCursor(0,140); tft.setTextColor(ILI9341_RED);  tft.setTextSize(3);  tft.println(strLastLevel);}
+                {tft.setCursor(0,140);  tft.setTextColor(ST7735_GREEN); tft.setTextSize(3);  tft.println(strLastLevel);}
+              else{tft.setCursor(0,140); tft.setTextColor(ST7735_RED);  tft.setTextSize(3);  tft.println(strLastLevel);}
             }             
         }
       
@@ -2094,13 +2446,13 @@ void loop()
                     {
                       str1 = "CF=";  str2 =  String(abs(fltInput_pp_to_rmsRatio/2.828));str2 = str2 + " [" + (abs(20* log10(fltInput_pp_to_rmsRatio/2.828))) +"dB]";
                       str2 = str2 + "(PEP/Pavg)"; // RF Power metrology for SSB
-                      tft.setCursor(0,180); tft.setTextColor(ILI9341_YELLOW);  tft.setTextSize(2);  tft.println(str1 + str2); strLastCF = str1 + str2;
+                      tft.setCursor(0,180); tft.setTextColor(ST7735_YELLOW);  tft.setTextSize(2);  tft.println(str1 + str2); strLastCF = str1 + str2;
                     }  
                 }
             }
         } 
        if (blnDisplayLvl) {blnDisplayLvl = false; ulngLastLevelDisplayMs = millis();}
-       if (rmsMixIQ1234Out.available() == true)// Update rmsMixIQ1234OutAvg
+       if (false)   //(rmsMixIQ1234Out.available() == true)// Update rmsMixIQ1234OutAvg
         {
           fltrmsMixIQ1234Out = 1000 * rmsMixIQ1234Out.read();
             
@@ -2121,7 +2473,7 @@ void loop()
           
           if (intCountrmsMixIQ1234Out == 20000 *  (intCountrmsMixIQ1234Out/20000))// only print every 20000 updates 
             {
-              Serial.print("Line 2089: fltrmsLPInputMeasAvg= "); Serial.print(fltrmsLPInputMeasAvg);
+              Serial.print("Line 2125: fltrmsLPInputMeasAvg= "); Serial.print(fltrmsLPInputMeasAvg);
               Serial.print("  rmsMixIQ1234Out = " );Serial.print(fltrmsMixIQ1234Out); 
               Serial.print("  rmsMixIQ1234OutAvg = ");Serial.print(fltrmsMixIQ1234OutAvg);
               Serial.print("  Cnt="); Serial.print(intCountrmsMixIQ1234Out); 
@@ -2154,85 +2506,85 @@ void loop()
           if (fltppAmpLeftOutAvg < 50) {fltppAmpLeftOutAvg = 1000 * ppAmpLeftOut.readPeakToPeak();}
           else {fltppAmpLeftOutAvg = (.9 * fltppAmpLeftOutAvg) +  100 * ppAmpLeftOut.readPeakToPeak();} //moderate time constant for ppAmpLeft  average
         }
-      tft.fillScreen(ILI9341_BLACK);
+      tft.fillScreen(ST7735_BLACK);
       tft.setCursor(0, 0);
       str1 = chrModes[intMode];  str2 =  " Ch1 Out = "; str3 = " Ch1 In  = ";
-      tft.setTextColor(ILI9341_MAGENTA);  tft.setTextSize(3);  tft.println(str1);
-      tft.setTextColor(ILI9341_WHITE);  tft.setTextSize(3); tft.println(" Freq (Hz) =" + String(intTestFreqHz));
+      tft.setTextColor(ST7735_MAGENTA);  tft.setTextSize(3);  tft.println(str1);
+      tft.setTextColor(ST7735_WHITE);    tft.setTextSize(3);  tft.println(" Freq (Hz) =" + String(intTestFreqHz));
       tft.println(" ");
       //Threshold test based on Rev 2 120 tap LPFIR
       if (blnTestMode3K)
         {
           if ((fltppAmpLeftOutAvg > (fltNomCalLevel * .89)) && (fltppAmpLeftOutAvg < (fltNomCalLevel * 1.12))) //Nominal +/- 1 dB
             {
-              tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpLeftOutAvg)));
+              tft.setTextColor(ST7735_GREEN); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpLeftOutAvg)));
             }
           else 
             {
-              tft.setTextColor(ILI9341_RED); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpLeftOutAvg)));
+              tft.setTextColor(ST7735_RED); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpLeftOutAvg)));
             }
           if ((fltppi2s0InAvg > (fltNomCalLevel * fltNomInOutRatio * .89)) && (fltppi2s0InAvg < (fltNomCalLevel * fltNomInOutRatio * 1.12))) //Nominal +/- 1 dB
             {
-              tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s0InAvg)));
+              tft.setTextColor(ST7735_GREEN); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s0InAvg)));
             }
           else 
             {
-              tft.setTextColor(ILI9341_RED); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s0InAvg)));
+              tft.setTextColor(ST7735_RED); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s0InAvg)));
             }
           str2 =  " Ch2 Out = "; str3 = " Ch2 In  = ";
 
           if ((fltppAmpRightOutAvg > (fltNomCalLevel * .5 * .89)) && (fltppAmpRightOutAvg < (fltNomCalLevel * .5 * 1.12)))// //Nominal +/- 1 dB
             {
-              tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpRightOutAvg)));
+              tft.setTextColor(ST7735_GREEN); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpRightOutAvg)));
             }
           else 
             {
-              tft.setTextColor(ILI9341_RED); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpRightOutAvg)));
+              tft.setTextColor(ST7735_RED); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpRightOutAvg)));
             }
           if ((fltppi2s1InAvg > (fltNomCalLevel * .5 * .89 * fltNomInOutRatio )) && (fltppi2s1InAvg < fltNomCalLevel * .5 * 1.12 * fltNomInOutRatio ))// Nominal +/- 1 dB
             {
-              tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s1InAvg))); 
+              tft.setTextColor(ST7735_GREEN); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s1InAvg))); 
             }
           else 
             {
-              tft.setTextColor(ILI9341_RED); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s1InAvg)));
+              tft.setTextColor(ST7735_RED); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s1InAvg)));
             }
         }
       if (blnTestMode6K)
         {
           if ((fltppAmpLeftOutAvg > (fltNomCalLevel * .5 * .89 )) && (fltppAmpLeftOutAvg < (fltNomCalLevel * .5 * 1.12  )))//Nominal +/- 1 dB
             {
-              tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpLeftOutAvg)));
+              tft.setTextColor(ST7735_GREEN); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpLeftOutAvg)));
             }
             else 
               {
-                tft.setTextColor(ILI9341_RED); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpLeftOutAvg)));
+                tft.setTextColor(ST7735_RED); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpLeftOutAvg)));
               }
             if ((fltppi2s0InAvg > (fltNomCalLevel * .5 * .89 * fltNomInOutRatio )) && (fltppi2s0InAvg < fltNomCalLevel * .5 * 1.12 * fltNomInOutRatio ))//Nominal +/- 1 dB
               {
-                tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s0InAvg)));
+                tft.setTextColor(ST7735_GREEN); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s0InAvg)));
               }
             else 
               {
-                tft.setTextColor(ILI9341_RED); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s0InAvg)));
+                tft.setTextColor(ST7735_RED); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s0InAvg)));
               }
 
             str2 =  " Ch2 Out = "; str3 = " Ch2 In  = ";
             if ((fltppAmpRightOutAvg > (fltNomCalLevel * .89)) && (fltppAmpRightOutAvg < (fltNomCalLevel * 1.12))) //Nominal +/- 1 dB
               {
-                tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpRightOutAvg)));
+                tft.setTextColor(ST7735_GREEN); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpRightOutAvg)));
               }
             else 
               {
-                tft.setTextColor(ILI9341_RED); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpRightOutAvg)));
+                tft.setTextColor(ST7735_RED); tft.setTextSize(3); tft.println(str2 +  String(int(fltppAmpRightOutAvg)));
               }
             if ((fltppi2s1InAvg > (fltNomCalLevel * fltNomInOutRatio * .89)) && (fltppi2s1InAvg < (fltNomCalLevel * fltNomInOutRatio * 1.12))) //Nominal +/- 1 dB
               {
-                tft.setTextColor(ILI9341_GREEN); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s1InAvg)));
+                tft.setTextColor(ST7735_GREEN); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s1InAvg)));
               }
             else 
               {
-                tft.setTextColor(ILI9341_RED); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s1InAvg)));
+                tft.setTextColor(ST7735_RED); tft.setTextSize(3); tft.println(str3 +  String(int(fltppi2s1InAvg)));
               }
         }
       delay(50);
@@ -2283,7 +2635,7 @@ void loop()
   // Adjust  S:N only every 2-5 ms 
   if (int(ulngCurrentElapsedTimeUs - ulngLastSNUpdateUs) > random(2000, 5000)); // Only adjust S:N every 2-5ms
     {
-      if (blnSim) { AdjustS_N ( intTargetSN, fltppLPInputMeasAvg);}
+      if (blnSim) { AdjustS_N ( intTargetSN, fltppLPInputMeasAvg, true);}// operator-set target S:N (boot/dial/serial): prints one calibration block on change
       ulngLastSNUpdateUs = ulngCurrentElapsedTimeUs;
       // Code for Fading a Channel (modes 0-4) WGN,MPG,MPM,MPP,MPD
       if ((intFadeDepth_dB > 0) && (fltFadeRate > .01) && blnSim)
@@ -2292,7 +2644,7 @@ void loop()
         }
       else if (blnSim) 
         {
-          AdjustS_N ( intTargetSN, fltppLPInputMeasAvg);
+          AdjustS_N ( intTargetSN, fltppLPInputMeasAvg, true);// operator-set target S:N (non-fade steady): prints one calibration block on change
         }
     }// End of Code to handle S:N adjustment
 
@@ -2349,11 +2701,11 @@ void loop()
     }
   }
   // Code for updating Encoder push buttons
-  debouncer1.update();//right Encoder
-  debouncer2.update();//left Encoder
-  if (debouncer1.fell())//Right Encoder "push"
+  debouncer1.update();          //right Encoder
+  debouncer2.update();          //left Encoder
+  if (debouncer1.fell())        //Right Encoder "push"
     {
-      blnEnableTestTone = !blnEnableTestTone;//Toggle Test tone
+      blnEnableTestTone = !blnEnableTestTone; //Toggle Test tone
       if (intMode < 5)
         {
           if (blnEnableTestTone)
@@ -2373,12 +2725,12 @@ void loop()
       if ((intMode >= 5) && (intMode <= 16)) //Gain and output level settings)setting to  EEPROM
         {
           SaveParametersToEEPROM();
-           tft.setCursor(0,70);tft.setTextColor(ILI9341_WHITE);  tft.setTextSize(3); tft.println(" SAVED TO EEPROM");
+           tft.setCursor(0,70);tft.setTextColor(ST7735_WHITE);  tft.setTextSize(3); tft.println(" SAVED TO EEPROM");
         }
       delay(100);  
     }
  
-  if (debouncer2.fell())//Left Encoder Push
+  if (debouncer2.fell())        //Left Encoder Push
     {
       if (blnTestMode3K || blnTestMode6K)
         {
@@ -2401,33 +2753,61 @@ void loop()
   while  (Serial.available() > 0)//While there are any unprocessed characters received via the serial port
     {
       char inChar = Serial.read();//Read one char
-      if (inChar == '\n')//if it is a New Line (Cr)
+      if (inChar == '\n') //if it is a New Line (Cr)
         {
           //Serial.print("Mode=");//Debugging code ...remove
           //Serial.println(strMode.toUpperCase());//Shift to upper makes all case insensitive
           //Serial.print("Parameter=");
           //Serial.println(strParameter.toUpperCase());//Shift to upper makes all case insensitive
           intSerialCmdMode = -1; intSerialCmdParam = -1;
-          if (blnSim)
+          boolean blnCommandStartedInSim = blnSim;
+          String strCmd = strMode; strCmd.trim(); strCmd = strCmd.toUpperCase();
+          if (strCmd == "RESET")
             {
-              intSerialCmdMode = ParseSimMode(strMode);
-              if (intSerialCmdMode == 18)//  Moved to 18 to accomodate TEST3K, TEST6K
+              Serial.println("OK RESET");
+              Serial.flush();
+              delay(50);
+              SCB_AIRCR = 0x05FA0004;
+              while (1) {}
+            }
+          else if (strCmd == "CODECINIT")
+            {
+              ReinitCodec();
+              ulngAppliedGeneration++;
+              Serial.print("OK CODECINIT GEN="); Serial.println(ulngAppliedGeneration);
+            }
+          else if (strCmd == "STATUS") {PrintStatus();}
+          else if (strCmd == "LEVEL") {PrintLevel();}
+          else if (strCmd == "HELP") {PrintHelp();}
+          else if (strCmd == "DEBUG ON") {blnDebugAdjustSN = true; Serial.println("OK DEBUG ON");}
+          else if (strCmd == "DEBUG OFF") {blnDebugAdjustSN = false; Serial.println("OK DEBUG OFF");}
+          else if (blnSim)
+            {
+              if (strCmd == "BUSY")
                 {
-                  Serial.println("OK");//Serial Command is OK
                   blnSim = false;  blnInitialized = false;  blnEnableTestTone = false;
                   InitializeBusy();
+                  ulngAppliedGeneration++;
+                  Serial.println("OK");
                 }
-              else if (intSerialCmdMode > -1)
+              else
                 {
-                  //Serial.print("Line 2240: intSerialCmdMode = ");Serial.println(intSerialCmdMode);
-                  if (ParseSetSimParameter(strParameter, intSerialCmdMode))
+                  intSerialCmdMode = ParseSimMode(strMode);
+                  if (intSerialCmdMode > -1)
                     {
-                      Serial.println("OK"); //Serial Command is OK
-                      if (intSerialCmdMode < 5){ ParseSetParameter(strParameter, intSerialCmdMode);}
+                      if (SimulationParameterSyntaxValid(strParameter, intSerialCmdMode) && ParseSetSimParameter(strParameter, intSerialCmdMode))
+                        {
+                          if (intSerialCmdMode < 5)
+                            {
+                              if (ApplyChannelMode(intSerialCmdMode)) {Serial.println("OK");}
+                              else {Serial.println("?"); intSerialCmdMode = -1;}
+                            }
+                          else {ulngAppliedGeneration++; Serial.println("OK");}
+                        }
+                      else {Serial.println("?"); intSerialCmdMode = -1;}//Serial Command fail
                     }
-                  else { Serial.println("?"); }//Serial Command fail}
+                  else {Serial.println("?");}
                 }
-              else {Serial.println("?");}
             }
           else   
             {
@@ -2436,14 +2816,30 @@ void loop()
                 {
                   Serial.println("OK");//Serial Command is OK
                   strMode = ""; strParameter = ""; blnColon = false; //Initialize
-                  setup();
+                  setup();        // <------------------------------------------------- why this here?? TRL
                 }
               else if (intSerialCmdMode > -1)
                 {
-                  if (ParseSetBusyParameter(strParameter, intSerialCmdMode)){ Serial.println("OK");} //Serial Command is OK
-                  else {Serial.println("?");} //Serial Command fail     
+                  if (IsIntegerParameter(strParameter) && ParseSetBusyParameter(strParameter, intSerialCmdMode)){ulngAppliedGeneration++; Serial.println("OK");} //Serial Command is OK
+                  else {Serial.println("?"); intSerialCmdMode = -1;} //Serial Command fail
                 }
               else {Serial.println("?");}
+            }
+          if ((strCmd != "STATUS") && (strCmd != "LEVEL") && (strCmd != "HELP") &&
+              (strCmd != "RESET") && (strCmd != "CODECINIT") &&
+              (strCmd != "DEBUG ON") && (strCmd != "DEBUG OFF"))
+            {
+              if (blnCommandStartedInSim)
+                {
+                  if (!blnSim) {PrintDSPStateAck(true);}
+                  else {PrintDSPStateAck((intSerialCmdMode > -1) && SimulatorRequestConfirmed(strParameter, intSerialCmdMode));}
+                }
+              else
+                {
+                  if (blnSim) {Serial.println("ACK SIM OK");}
+                  else {PrintDSPStateAck((intSerialCmdMode > -1) && BusyRequestConfirmed(strParameter, intSerialCmdMode));}
+                }
+              DisplayWatchdog(true);
             }
           // Process the command by setting mode and parameter Set display to show just received mode/parameter
           strMode = ""; strParameter = ""; blnColon = false; //Initialize
@@ -2452,5 +2848,9 @@ void loop()
     else if (blnColon == true) {strParameter += inChar;}//Accumulate the parameter
     else {strMode += inChar;} //Accumulate the mode
   }//End while Serial.available
+  DisplayWatchdog(false);
   intSerialCmdMode = -1; intSerialCmdParam = -1;
+
 }// End Main Loop *******************************************************************************
+
+// ************************************ The Very End ********************************************

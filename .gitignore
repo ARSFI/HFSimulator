@@ -32,3 +32,6 @@
 *.app
 
 .DS_Store
+BuildIdentity.h
+__pycache__/
+*.pyc
