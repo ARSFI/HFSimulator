@@ -12,6 +12,7 @@
 
     Change  Log:
     Date:     Rev:      Description:
+    10/27/2026   2.05b1 Updtaed to ILI9341_t3n.h, removed extra tft.begin();
     9/21/2026    2.05   Classify the AdjustS_N calibration debug output by source: the fade loop's internal per-step S:N changes no longer print (so a running fade cannot flood the serial link), while operator-initiated changes (boot, front-panel dial, serial S:N command) still print one block. DEBUG ON|OFF verb re-enables the legacy per-step firehose and STATUS reports its state.
     9/21/2026    2.04   Bump the consolidated firmware revision and sketch name.
     11/17/2020   2.03   Modify multipath delay settings for 4 path mode as suggested by Peter Helfert.
@@ -96,7 +97,7 @@
 #include <Bounce2.h>
 #include "Encoder2.h"
 //#include "SPI.h"
-#include "ILI9341_t3.h"
+#include "ILI9341_t3n.h"
 #include <EEPROM.h>
 
 #if defined(__has_include)
@@ -114,7 +115,7 @@
 #error "Release builds require an attested BuildIdentity.h"
 #endif
 static const char chrBuildIdentity[] = HFSIM_GIT_DESCRIBE "@" HFSIM_BUILD_UTC;
-#define HFSIM_FIRMWARE_REVISION "2.05"
+#define HFSIM_FIRMWARE_REVISION "b1"
 
 Encoder2 ENC1(1, 0); // (right) modes
 Encoder2 ENC2(4, 3); // (left) parameters
@@ -131,7 +132,7 @@ Encoder2 ENC2(4, 3); // (left) parameters
 
 Bounce debouncer1 = Bounce();
 Bounce debouncer2 = Bounce();
-ILI9341_t3 tft = ILI9341_t3(TFT_CS, TFT_DC);
+ILI9341_t3n tft = ILI9341_t3n(TFT_CS, TFT_DC);
 
 // Teensy Audio components (currently 35 components used) 
 AudioControlSGTL5000            sgtl5000_1;
@@ -785,7 +786,7 @@ void PlotSpectrum(float fltFFTBins[], int intLowHz, int intHighHz, boolean blnIn
   if (blnInitSpectrum)//initialize tft, set rotation, clear screen, initialize text (will cause flicker)
     {
       blnInitSpectrum = false;
-      tft.begin();
+      //tft.begin();            // TRL ver 2.05b1
       tft.setCursor(0,0);
       tft.setRotation(1);
       tft.fillScreen(ILI9341_BLACK);
@@ -1325,7 +1326,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
 //**** Subroutine UpdateTFTModeParameter**********************************************************
 void UpdateTFTModeParameter(String s1, String s2, String s3)
 {
-  tft.begin();
+  //tft.begin();      // TRL Ver 2.05b1
   tft.setRotation(1);
   tft.fillScreen(ILI9341_BLACK);
   tft.setTextColor(ILI9341_CYAN);  tft.setTextSize(3);  tft.println(s1);
@@ -1838,7 +1839,7 @@ void setup()
 // InitializeBusy *******************************************************************************************
 void InitializeBusy()
 {
-  tft.begin();
+  //tft.begin();          // trl 2.05b1
   tft.fillScreen(ILI9341_BLACK);
   tft.setRotation(1);
   tft.setTextColor(ILI9341_WHITE);  tft.setTextSize(4);  tft.println("BUSY DETECT  ");
@@ -1898,7 +1899,7 @@ void loop()
                 }
               }
         }
-      tft.begin();
+      //tft.begin();          // trl 2.05b1
       tft.setRotation(1);
       tft.fillScreen(ILI9341_BLACK);
       if (intMode == 0)//WGN
@@ -2030,7 +2031,7 @@ void loop()
       blnInitModes = false; blnInitSpectrum  = true;
       if (blnSim)// code for SIM
         {
-          tft.begin();
+          //tft.begin();          // trl 2.05b1
           tft.setRotation(1);
           tft.fillScreen(ILI9341_BLACK);
           if ((intMode >= 0) && (intMode <= 4))
