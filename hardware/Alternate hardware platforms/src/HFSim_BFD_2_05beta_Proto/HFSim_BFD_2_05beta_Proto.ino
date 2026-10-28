@@ -745,7 +745,7 @@ void QuadGauss12FIR128( int Mode)
    *  A similar process is used for the I2 and Q2 components for path I2,Q2   
    */
   mixIQ12.gain(1, fltI1); mixIQ12.gain(0,-fltQ1); mixIQ12.gain(3, fltI2); mixIQ12.gain(2,-fltQ2);//Update the mixIQgains
-  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);;mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
+  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
 }//  End *************************************** QuadGauss12FIR128 ************************************
 
 void QuadGauss34FIR128( int Mode)
@@ -817,7 +817,7 @@ void QuadGauss34FIR128( int Mode)
    *  A similar process is used for the I2 and Q2 components for path I2,Q2   
    */
   mixIQ34.gain(1, fltI3); mixIQ34.gain(0,-fltQ3); mixIQ34.gain(3, fltI4); mixIQ34.gain(2,-fltQ4);//Update the mixIQgains
-  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);;mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
+  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
 }//  End *************************************** QuadGauss34FIR128************************************
 
 
@@ -1280,7 +1280,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
     {
       str1 = chrBusyModes[intMode];  str2 = "    " + String(intParam); str3 = " Hz";
       UpdateTFTModeParameter(str1, str2, str3);
-      intBusyBWLoHz = intParam; ; return true;
+      intBusyBWLoHz = intParam; return true;
     }
   }
   if (intMode == 3)//HIGH FREQ
@@ -1289,7 +1289,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
     {
       str1 = chrBusyModes[intMode];  str2 = "    " + String(intParam); str3 = " Hz";
       UpdateTFTModeParameter(str1, str2, str3);
-      intBusyBWHiHz = intParam; ; return true;
+      intBusyBWHiHz = intParam; return true;
     }
   }
   if (intMode == 4)//THRES (dB)
@@ -1938,7 +1938,7 @@ void InitializeBusy()
   delay(1000);
   fltCurrentDelayI1Ms = fltMinimumIDelayMs; 
   mixIQ12.gain(0, 0); mixIQ12.gain(1, .8498); mixIQ12.gain(2, 0); mixIQ12.gain(3,0);
-  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);;mixPathSel.gain(2, 0.0);;mixPathSel.gain(3, 0.0);
+  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
   
   filLPWhiteFIR.begin(sht3KHzLPFIRCoeffRev2,120); // White Noise LP Filter
   intFMRatePtr = 1;
@@ -1979,7 +1979,7 @@ void loop()
                   if (intMode == 0){mixIQ12.gain(0,0.0);mixIQ12.gain(1,.8498);mixIQ12.gain(2,0.0);mixIQ12.gain(3,0.0);};
                   // If mode != 0 above, mixIQ.gains will be set by calls to QuadGaussFIR128 @ 64 x the doppler rate
                   SetIQTapDelays(intMode);
-                  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);;mixPathSel.gain(2, 0.0);;mixPathSel.gain(3, 0.0);
+                  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
                   SetIQTapDelays(intMode);
                   blnModes = true;
                 }
@@ -1987,7 +1987,7 @@ void loop()
                 {// Use Up/Down mixing
                   SetIQTapDelays(intMode);
                   mixIQ12.gain(0,0.0);mixIQ12.gain(1,.8498);mixIQ12.gain(2,0.0);mixIQ12.gain(3,0.0);SetIQTapDelays(intMode);
-                  mixPathSel.gain(0, 0.0);mixPathSel.gain(1, 2.0819);;mixPathSel.gain(2, 0.0);;mixPathSel.gain(3, 0.0);
+                  mixPathSel.gain(0, 0.0);mixPathSel.gain(1, 2.0819);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
                   // Value 2.0819 calibrates mixUpDn Path gain = to direct path gain.
                   blnModes = true;
                 }
@@ -2098,7 +2098,7 @@ void loop()
           mixInpSel.gain(0, 2.0); mixInpSel.gain(1, 0.0); mixInpSel.gain(2, 0.0); mixInpSel.gain(3, 0.0);
           mixIQ12.gain(0, 0.0); mixIQ12.gain(1, 4.0); mixIQ12.gain(2, 0.0); mixIQ12.gain(3, 0.0);// 
           
-          if (!(intBandwidth == 3000)); intBandwidth = 3000; SetFilterBandwidth(intBandwidth);
+          intBandwidth = 3000; SetFilterBandwidth(intBandwidth);
           sine_VLF_Dnmix_Mod.amplitude(0);
           InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
         }
@@ -2110,7 +2110,7 @@ void loop()
           mixInpSel.gain(0, 2.00); mixInpSel.gain(1, 0.0); mixInpSel.gain(2, 0.0); mixInpSel.gain(3, 0.0);
           mixIQ12.gain(0, 0.0); mixIQ12.gain(1, 4.0); mixIQ12.gain(2, 0.0); mixIQ12.gain(3, 0.0);//
           sine_VLF_Dnmix_Mod.amplitude(0);
-          if (!(intBandwidth == 6000)); intBandwidth = 6000; SetFilterBandwidth(intBandwidth);
+          intBandwidth = 6000; SetFilterBandwidth(intBandwidth);
           InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
         }
        
