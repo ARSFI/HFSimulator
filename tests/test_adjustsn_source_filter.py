@@ -15,14 +15,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION = ROOT / "src" / "HFSim_BFD_2_05" / "HFSim_BFD_2_05.ino"
+PRODUCTION = ROOT / "src" / "HFSim_BFD_2_05beta" / "HFSim_BFD_2_05beta.ino"
 PROTO = (
     ROOT
     / "hardware"
     / "Alternate hardware platforms"
     / "src"
-    / "HFSim_BFD_2_05_Proto"
-    / "HFSim_BFD_2_05_Proto.ino"
+    / "HFSim_BFD_2_05beta_Proto"
+    / "HFSim_BFD_2_05beta_Proto.ino"
 )
 
 FIRMWARES = (PRODUCTION, PROTO)
@@ -99,10 +99,10 @@ class AdjustSNSourceFilterTest(unittest.TestCase):
         for fw in FIRMWARES:
             with self.subTest(firmware=str(fw.relative_to(ROOT))):
                 src = fw.read_text(encoding="utf-8")
-                # Both live-loop steady-adjust call sites (which pick up operator dial/serial
-                # changes to the target S:N) request the operator source.
+                # The steady branch picks up operator dial/serial target changes
+                # and requests the operator source. Fade updates stay quiet.
                 self.assertIn(
-                    "if (blnSim) { AdjustS_N ( intTargetSN, fltppLPInputMeasAvg, true);}",
+                    "else if (blnSim)",
                     src,
                 )
                 self.assertIn(

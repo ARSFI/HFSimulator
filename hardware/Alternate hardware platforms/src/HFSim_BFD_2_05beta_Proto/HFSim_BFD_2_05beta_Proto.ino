@@ -2633,9 +2633,8 @@ void loop()
      
         
   // Adjust  S:N only every 2-5 ms 
-  if (int(ulngCurrentElapsedTimeUs - ulngLastSNUpdateUs) > random(2000, 5000)); // Only adjust S:N every 2-5ms
+  if (int(ulngCurrentElapsedTimeUs - ulngLastSNUpdateUs) > random(2000, 5000)) // Only adjust S:N every 2-5ms
     {
-      if (blnSim) { AdjustS_N ( intTargetSN, fltppLPInputMeasAvg, true);}// operator-set target S:N (boot/dial/serial): prints one calibration block on change
       ulngLastSNUpdateUs = ulngCurrentElapsedTimeUs;
       // Code for Fading a Channel (modes 0-4) WGN,MPG,MPM,MPP,MPD
       if ((intFadeDepth_dB > 0) && (fltFadeRate > .01) && blnSim)
