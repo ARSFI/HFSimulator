@@ -3,27 +3,31 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION = ROOT / "src" / "HFSim_BFD_2_05beta" / "HFSim_BFD_2_05beta.ino"
+PRODUCTION = ROOT / "src" / "HFSim_BFD_2_06" / "HFSim_BFD_2_06.ino"
 PROTO = (
     ROOT
     / "hardware"
     / "Alternate hardware platforms"
     / "src"
-    / "HFSim_BFD_2_05beta_Proto"
-    / "HFSim_BFD_2_05beta_Proto.ino"
+    / "HFSim_BFD_2_06_Proto"
+    / "HFSim_BFD_2_06_Proto.ino"
 )
 
 
 class FirmwareRevisionTest(unittest.TestCase):
-    def test_sketches_follow_the_2_05_naming_convention(self):
+    def test_sketches_follow_the_2_06_naming_convention(self):
         self.assertTrue(PRODUCTION.is_file())
         self.assertTrue(PROTO.is_file())
         # Previous sketch directories must not linger after the rename.
         self.assertFalse((ROOT / "src" / "HFSim_BFD_2_03").exists())
         self.assertFalse((ROOT / "src" / "HFSim_BFD_2_04").exists())
+        self.assertFalse((ROOT / "src" / "HFSim_BFD_2_05").exists())
+        self.assertFalse((ROOT / "src" / "HFSim_BFD_2_05beta").exists())
         proto_src = ROOT / "hardware" / "Alternate hardware platforms" / "src"
         self.assertFalse((proto_src / "HFSim_BFD_2_03_Proto").exists())
         self.assertFalse((proto_src / "HFSim_BFD_2_04_Proto").exists())
+        self.assertFalse((proto_src / "HFSim_BFD_2_05_Proto").exists())
+        self.assertFalse((proto_src / "HFSim_BFD_2_05beta_Proto").exists())
 
     def test_live_revision_surfaces_report_2_06(self):
         for firmware in (PRODUCTION, PROTO):

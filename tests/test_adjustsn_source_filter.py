@@ -15,14 +15,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION = ROOT / "src" / "HFSim_BFD_2_05beta" / "HFSim_BFD_2_05beta.ino"
+PRODUCTION = ROOT / "src" / "HFSim_BFD_2_06" / "HFSim_BFD_2_06.ino"
 PROTO = (
     ROOT
     / "hardware"
     / "Alternate hardware platforms"
     / "src"
-    / "HFSim_BFD_2_05beta_Proto"
-    / "HFSim_BFD_2_05beta_Proto.ino"
+    / "HFSim_BFD_2_06_Proto"
+    / "HFSim_BFD_2_06_Proto.ino"
 )
 
 FIRMWARES = (PRODUCTION, PROTO)
