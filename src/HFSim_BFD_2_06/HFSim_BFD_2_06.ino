@@ -1255,6 +1255,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
       UpdateTFTModeParameter(str1, str2, str3);
       InputTestWaveform.frequency (intParam); InputTestWaveform.amplitude(.251880522);
       mixInpSel.gain(0, 2); mixInpSel.gain(1, 0); mixInpSel.gain(2, 0); mixInpSel.gain(3, 0);
+      intTestFreqHz = intParam; blnEnableTestTone = true;
       return true;
     }
   }
@@ -1266,6 +1267,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
       str1 = chrBusyModes[intMode];  str2 = ""; str3 = "";
       UpdateTFTModeParameter(str1, str2, str3);
       mixInpSel.gain(0, 0); mixInpSel.gain(1, 0); mixInpSel.gain(2, fltLogs[intGainLevel[0]]); mixInpSel.gain(3, 0);
+      blnEnableTestTone = false;
       return true;
     }
   }
@@ -1362,12 +1364,12 @@ String SimulatorStateParameterText(int intStateMode)
 String BusyStateParameterText(int intStateMode)
 {
   if (intStateMode == 0) {return String(intAvg);}
-  if (intStateMode == 1) {return "0";}
+  if (intStateMode == 1) {return String(blnEnbBusyDetect ? 1 : 0);}
   if (intStateMode == 2) {return String(intBusyBWLoHz);}
   if (intStateMode == 3) {return String(intBusyBWHiHz);}
   if (intStateMode == 4) {return String(intThresh);}
   if (intStateMode == 5) {return String(intTestFreqHz);}
-  if (intStateMode == 6) {return "0";}
+  if (intStateMode == 6) {return String(blnEnableTestTone ? 1 : 0);}
   if (intStateMode == 7) {return String(intGainLevel[0]);}
   if (intStateMode == 8) {return String(intBandwidth);}
   if (intStateMode == 9) {return String(blnPlotSpectrum ? 1 : 0);}
@@ -2726,7 +2728,7 @@ void loop()
                 }
               else if (intSerialCmdMode > -1)
                 {
-                  if (IsIntegerParameter(strParameter) && ParseSetBusyParameter(strParameter, intSerialCmdMode)){ulngAppliedGeneration++; Serial.println("OK");} //Serial Command is OK
+                  if (IsIntegerParameter(strParameter) && ParseSetBusyParameter(strParameter, intSerialCmdMode)){intBusyMode = intSerialCmdMode; ulngAppliedGeneration++; Serial.println("OK");} //Serial Command is OK
                   else {Serial.println("?"); intSerialCmdMode = -1;} //Serial Command fail
                 }
               else {Serial.println("?");}
