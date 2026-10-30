@@ -26,6 +26,7 @@
 
     Change  Log:
     Date:     Rev:      Description:
+    10/27/2026   2.06   Fix stray semicolons and unfaded S:N updates during flat fading; match serial input level to the front panel and retain max-hold separately.
     9/21/2026    2.05   Classify the AdjustS_N calibration debug output by source: the fade loop's internal per-step S:N changes no longer print (so a running fade cannot flood the serial link), while operator-initiated changes (boot, front-panel dial, serial S:N command) still print one block. DEBUG ON|OFF verb re-enables the legacy per-step firehose and STATUS reports its state.
     9/21/2026    2.04   Bump the consolidated firmware revision and sketch name.
     11/17/2020   2.03   Modify multipath delay settings for 4 path mode as suggested by Peter Helfert.
@@ -139,7 +140,7 @@ SWT2 Connect to pin 26
 #error "Release builds require an attested BuildIdentity.h"
 #endif
 static const char chrBuildIdentity[] = HFSIM_GIT_DESCRIBE "@" HFSIM_BUILD_UTC;
-#define HFSIM_FIRMWARE_REVISION "2.05"
+#define HFSIM_FIRMWARE_REVISION "2.06"
 
 // For the Adafruit shield  Proto ST7798, these are the default. 
 #define TFT_DC  9
@@ -745,7 +746,7 @@ void QuadGauss12FIR128( int Mode)
    *  A similar process is used for the I2 and Q2 components for path I2,Q2   
    */
   mixIQ12.gain(1, fltI1); mixIQ12.gain(0,-fltQ1); mixIQ12.gain(3, fltI2); mixIQ12.gain(2,-fltQ2);//Update the mixIQgains
-  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);;mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
+  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
 }//  End *************************************** QuadGauss12FIR128 ************************************
 
 void QuadGauss34FIR128( int Mode)
@@ -817,7 +818,7 @@ void QuadGauss34FIR128( int Mode)
    *  A similar process is used for the I2 and Q2 components for path I2,Q2   
    */
   mixIQ34.gain(1, fltI3); mixIQ34.gain(0,-fltQ3); mixIQ34.gain(3, fltI4); mixIQ34.gain(2,-fltQ4);//Update the mixIQgains
-  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);;mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
+  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
 }//  End *************************************** QuadGauss34FIR128************************************
 
 
@@ -984,16 +985,22 @@ void SetIQTapDelays(int intMode)
     //Serial.print("Line 1014 SetIQTapDelays: intMode = ");Serial.print(intMode); Serial.print("  Paths:"); Serial.println(intMultipaths);
 } // End SetIQTapDelays **************************************************************************
 
-boolean ApplyChannelMode(int intRequestedMode)
+// Leave TEST3K/TEST6K and the test tone: restore the operator input/output gains.
+void ClearTestSource()
 {
-  if ((!blnSim) || (intRequestedMode < 0) || (intRequestedMode > 4)) {return false;}
-
-  intMode = intRequestedMode;
   blnTestMode3K = false; blnTestMode6K = false; blnEnableTestTone = false;
   InputTestWaveform.amplitude(0);
   mixInpSel.gain(0, 0); mixInpSel.gain(1, 0.0);
   mixInpSel.gain(2, 100 * fltLogs[intGainLevel[0]]); mixInpSel.gain(3, 100 * fltLogs[intGainLevel[1]]);
   ampLeftOut.gain(fltLogs[intGainLevel[2]]); ampRightOut.gain(fltLogs[intGainLevel[3]]);
+}
+
+boolean ApplyChannelMode(int intRequestedMode)
+{
+  if ((!blnSim) || (intRequestedMode < 0) || (intRequestedMode > 4)) {return false;}
+
+  intMode = intRequestedMode;
+  ClearTestSource();
   intCountrmsMixIQ1234Out = 0;
   SetIQTapDelays(intMode);
 
@@ -1020,13 +1027,66 @@ boolean ApplyChannelMode(int intRequestedMode)
   return true;
 }
 
+// TEST3K/TEST6K entry, used by the mode encoder and by the serial TEST3K:/TEST6K: commands.
+boolean ApplyTestMode(int intRequestedMode)
+{
+  if ((!blnSim) || ((intRequestedMode != 17) && (intRequestedMode != 18))) {return false;}
+
+  intMode = intRequestedMode;
+  if (intMode == 17)//TEST3K
+    {
+      blnTestMode3K = true; blnTestMode6K = false; intTestFreqHz = 1500; intTargetSN = 40;
+      // Set gains to over ride other mode settings:
+      ampLeftOut.gain(2.0); ampRightOut.gain(1.0);
+      mixInpSel.gain(0, 2.0); mixInpSel.gain(1, 0.0); mixInpSel.gain(2, 0.0); mixInpSel.gain(3, 0.0);
+      mixIQ12.gain(0, 0.0); mixIQ12.gain(1, 4.0); mixIQ12.gain(2, 0.0); mixIQ12.gain(3, 0.0);// 
+
+      intBandwidth = 3000; SetFilterBandwidth(intBandwidth);
+      sine_VLF_Dnmix_Mod.amplitude(0);
+      InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
+    }
+  if (intMode == 18)//TEST6K
+    {
+      blnTestMode6K = true; blnTestMode3K = false; intTestFreqHz = 3000; intTargetSN = 40;
+      // Set gains to over ride other mode settings:
+      ampLeftOut.gain(1.0); ampRightOut.gain(2.0);
+      mixInpSel.gain(0, 2.00); mixInpSel.gain(1, 0.0); mixInpSel.gain(2, 0.0); mixInpSel.gain(3, 0.0);
+      mixIQ12.gain(0, 0.0); mixIQ12.gain(1, 4.0); mixIQ12.gain(2, 0.0); mixIQ12.gain(3, 0.0);//
+      sine_VLF_Dnmix_Mod.amplitude(0);
+      intBandwidth = 6000; SetFilterBandwidth(intBandwidth);
+      InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
+    }
+  return true;
+}
+
+// TEST3K: 300 - 3300 Hz, TEST6K: 300 - 6300 Hz. Lower limit is ~40 Hz at -.5dB (-1.5 dB @10 Hz) with 10 uf Caps.
+int TestFrequencyAtStops(int intTestMode, int intRequestedHz)
+{
+  int intMaxHz = (intTestMode == 17) ? 3300 : 6300;
+  if (intRequestedHz > intMaxHz) {return intMaxHz;} //Hold at stops
+  if (intRequestedHz < 300) {return 300;}
+  return intRequestedHz;
+}
+
+// TEST3K/TEST6K tone frequency, used by the parameter encoder and by the serial commands.
+void SetTestFrequency(int intRequestedHz)
+{
+  if ((intMode != 17) && (intMode != 18)) {return;}
+  int intTestBandwidth = (intMode == 17) ? 3000 : 6000;
+  SetFilterBandwidth(intTestBandwidth);
+  intTestFreqHz = TestFrequencyAtStops(intMode, intRequestedHz);
+  intBandwidth = intTestBandwidth; intTuneOffset = 0;
+  InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
+  mixInpSel.gain(0, 2); mixInpSel.gain(1, 0); mixInpSel.gain(2, 0); mixInpSel.gain(3, 0);
+}
+
 //******Function to Parse Simulator Mode received via Serial Port *********************************
 int ParseSimMode (String strMode)
 {
-  // Returns mode index (0-15) if strMode is legitimate, -1 other wise (case insensitive)
-  for (int i=0; i < (intNumModes-3); i++) //Search through the available Modes and Parameters TEST3K, TEST6K not used. 
+  // Returns mode index (0-18) if strMode is legitimate, -1 other wise (case insensitive)
+  for (int i=0; i < intNumModes; i++) //Search through the available Modes and Parameters (SERIAL: has no serial setter)
   {
-    String strTemp = chrModes[i];
+    String strTemp = chrModes[i]; strTemp.toUpperCase();
     if  (strTemp.startsWith(strMode.toUpperCase()))
       {
         if (strTemp.startsWith("BUSY:"))
@@ -1095,7 +1155,7 @@ boolean IsIntegerParameter(String strValue)
 
 boolean SimulationParameterSyntaxValid(String strValue, int intRequestedMode)
 {
-  if ((intRequestedMode <= 6) || (intRequestedMode == 8) || (intRequestedMode == 15))
+  if ((intRequestedMode <= 6) || (intRequestedMode == 8) || (intRequestedMode == 15) || (intRequestedMode >= 17))
     {return IsIntegerParameter(strValue);}
   return IsNumericParameter(strValue);
 }
@@ -1240,6 +1300,13 @@ boolean ParseSetSimParameter(String strParameter, int intMode)
         }
       else {return false;}
     }  // Serial baud rate selection not implemented via serial port.
+  if ((intMode == 17) || (intMode == 18))//TEST3K, TEST6K: front panel entry, then the frequency knob
+    {
+      if (intParam != TestFrequencyAtStops(intMode, intParam)) {return false;}
+      if (!ApplyTestMode(intMode)) {return false;}
+      SetTestFrequency(intParam);
+      return true;
+    }
   return false;
 }// End ParseSetSimParameter *********************************************************************
 
@@ -1280,7 +1347,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
     {
       str1 = chrBusyModes[intMode];  str2 = "    " + String(intParam); str3 = " Hz";
       UpdateTFTModeParameter(str1, str2, str3);
-      intBusyBWLoHz = intParam; ; return true;
+      intBusyBWLoHz = intParam; return true;
     }
   }
   if (intMode == 3)//HIGH FREQ
@@ -1289,7 +1356,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
     {
       str1 = chrBusyModes[intMode];  str2 = "    " + String(intParam); str3 = " Hz";
       UpdateTFTModeParameter(str1, str2, str3);
-      intBusyBWHiHz = intParam; ; return true;
+      intBusyBWHiHz = intParam; return true;
     }
   }
   if (intMode == 4)//THRES (dB)
@@ -1312,6 +1379,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
       UpdateTFTModeParameter(str1, str2, str3);
       InputTestWaveform.frequency (intParam); InputTestWaveform.amplitude(.251880522);
       mixInpSel.gain(0, 2); mixInpSel.gain(1, 0); mixInpSel.gain(2, 0); mixInpSel.gain(3, 0);
+      intTestFreqHz = intParam; blnEnableTestTone = true;
       return true;
     }
   }
@@ -1323,6 +1391,7 @@ boolean ParseSetBusyParameter(String strParameter, int intMode)
       str1 = chrBusyModes[intMode];  str2 = ""; str3 = "";
       UpdateTFTModeParameter(str1, str2, str3);
       mixInpSel.gain(0, 0); mixInpSel.gain(1, 0); mixInpSel.gain(2, fltLogs[intGainLevel[0]]); mixInpSel.gain(3, 0);
+      blnEnableTestTone = false;
       return true;
     }
   }
@@ -1421,12 +1490,12 @@ String SimulatorStateParameterText(int intStateMode)
 String BusyStateParameterText(int intStateMode)
 {
   if (intStateMode == 0) {return String(intAvg);}
-  if (intStateMode == 1) {return "0";}
+  if (intStateMode == 1) {return String(blnEnbBusyDetect ? 1 : 0);}
   if (intStateMode == 2) {return String(intBusyBWLoHz);}
   if (intStateMode == 3) {return String(intBusyBWHiHz);}
   if (intStateMode == 4) {return String(intThresh);}
   if (intStateMode == 5) {return String(intTestFreqHz);}
-  if (intStateMode == 6) {return "0";}
+  if (intStateMode == 6) {return String(blnEnableTestTone ? 1 : 0);}
   if (intStateMode == 7) {return String(intGainLevel[0]);}
   if (intStateMode == 8) {return String(intBandwidth);}
   if (intStateMode == 9) {return String(blnPlotSpectrum ? 1 : 0);}
@@ -1454,7 +1523,7 @@ boolean SimulatorRequestConfirmed(String strRequestedParameter, int intRequested
   if (!FeatureParameterIsNumeric(strRequestedParameter)) {return false;}
   float fltRequested = strRequestedParameter.toFloat();
   float fltActual = SimulatorStateParameterText(intRequestedMode).toFloat();
-  boolean blnModeConfirmed = (intRequestedMode >= 5) || (intMode == intRequestedMode);
+  boolean blnModeConfirmed = ((intRequestedMode >= 5) && (intRequestedMode <= 16)) || (intMode == intRequestedMode);
   return blnSim && blnModeConfirmed && (abs(fltRequested - fltActual) < .001);
 }
 
@@ -1574,7 +1643,8 @@ void PrintDSPStateAck(boolean blnConfirmed)
 
 void PrintLevelFields()
 {
-  Serial.print(" INPUT_MVPP="); Serial.print(fltppLPInputMeasAvg, 1);
+  Serial.print(" INPUT_MVPP="); Serial.print(int(fltppInputForDisplay));
+  Serial.print(" INPUT_MVPP_MAXHOLD="); Serial.print(fltppLPInputMeasAvg, 1);
   Serial.print(" LEFT_OUT_MVPP="); Serial.print(fltppAmpLeftOutAvg, 1);
   Serial.print(" RIGHT_OUT_MVPP="); Serial.print(fltppAmpRightOutAvg, 1);
 }
@@ -1618,6 +1688,7 @@ void PrintHelp()
   Serial.println(F("SIM: CH1 IN|CH2 IN:<0|1|2|5|10|20|50|100|200>"));
   Serial.println(F("SIM: CH1 OUT|CH2 OUT:<0|0.01|0.02|0.05|0.1|0.2|0.5|1|2>"));
   Serial.println(F("SIM: BANDWIDTH:<3000|6000 Hz> | BUSY"));
+  Serial.println(F("SIM: TEST3K:<300..3300 Hz> | TEST6K:<300..6300 Hz> (leave with WGN|MPG|MPM|MPP|MPD:<S:N>)"));
   Serial.println(F("BUSY: ENB BUSY:<1..50> | DIS BUSY:0 | LOW:<43..5000> | HIGH:<500..6000>"));
   Serial.println(F("BUSY: THRESH:<3..40> | TONE ON:<43..6300> | TONE OFF:0"));
   Serial.println(F("BUSY: CH1 IN:<index 0..8> | BANDWIDTH:<3000|6000> | SPECTRUM:<0|1> | SIM"));
@@ -1938,7 +2009,7 @@ void InitializeBusy()
   delay(1000);
   fltCurrentDelayI1Ms = fltMinimumIDelayMs; 
   mixIQ12.gain(0, 0); mixIQ12.gain(1, .8498); mixIQ12.gain(2, 0); mixIQ12.gain(3,0);
-  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);;mixPathSel.gain(2, 0.0);;mixPathSel.gain(3, 0.0);
+  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
   
   filLPWhiteFIR.begin(sht3KHzLPFIRCoeffRev2,120); // White Noise LP Filter
   intFMRatePtr = 1;
@@ -1969,17 +2040,13 @@ void loop()
           if (intMode <= 4) {ApplyChannelMode(intMode);}
           else if (intMode < 17)
             {
-              blnTestMode3K = false; blnTestMode6K = false;  blnEnableTestTone = false;
-              InputTestWaveform.amplitude(0);
-              mixInpSel.gain(0, 0); mixInpSel.gain(1, 0.0); mixInpSel.gain(2, 100 * fltLogs[intGainLevel[0]]); mixInpSel.gain(3, 100 * fltLogs[intGainLevel[1]]);
-              ampLeftOut.gain(fltLogs[intGainLevel[2]]);//sets ampLeftOut gain (0-2 (log))
-              ampRightOut.gain(fltLogs[intGainLevel[3]]);//sets ampRightOut gain (0-2 (log))
+              ClearTestSource();
               if ( ((intMode >= 1)&& (intMode <=4))  || ((intMode == 0) && (intTuneOffset == 0) && (intFMDevPtr ==0)) )
                 {// Use Direct path (no Up/Down mixing
                   if (intMode == 0){mixIQ12.gain(0,0.0);mixIQ12.gain(1,.8498);mixIQ12.gain(2,0.0);mixIQ12.gain(3,0.0);};
                   // If mode != 0 above, mixIQ.gains will be set by calls to QuadGaussFIR128 @ 64 x the doppler rate
                   SetIQTapDelays(intMode);
-                  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);;mixPathSel.gain(2, 0.0);;mixPathSel.gain(3, 0.0);
+                  mixPathSel.gain(0, .5);mixPathSel.gain(1, 0.0);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
                   SetIQTapDelays(intMode);
                   blnModes = true;
                 }
@@ -1987,7 +2054,7 @@ void loop()
                 {// Use Up/Down mixing
                   SetIQTapDelays(intMode);
                   mixIQ12.gain(0,0.0);mixIQ12.gain(1,.8498);mixIQ12.gain(2,0.0);mixIQ12.gain(3,0.0);SetIQTapDelays(intMode);
-                  mixPathSel.gain(0, 0.0);mixPathSel.gain(1, 2.0819);;mixPathSel.gain(2, 0.0);;mixPathSel.gain(3, 0.0);
+                  mixPathSel.gain(0, 0.0);mixPathSel.gain(1, 2.0819);mixPathSel.gain(2, 0.0);mixPathSel.gain(3, 0.0);
                   // Value 2.0819 calibrates mixUpDn Path gain = to direct path gain.
                   blnModes = true;
                 }
@@ -2090,29 +2157,7 @@ void loop()
           tft.setTextColor(ST7735_GREEN);  tft.setTextSize(3);  tft.println(str2 + intBaudRate[intBaudPtr] + str3);  
           Serial.end(); Serial.begin(intBaudRate[intBaudPtr]);
         }  
-      if (intMode == 17)//TEST3K
-        {
-          blnTestMode3K = true; blnTestMode6K = false; intTestFreqHz = 1500; intTargetSN = 40;
-          // Set gains to over ride other mode settings:
-          ampLeftOut.gain(2.0); ampRightOut.gain(1.0);
-          mixInpSel.gain(0, 2.0); mixInpSel.gain(1, 0.0); mixInpSel.gain(2, 0.0); mixInpSel.gain(3, 0.0);
-          mixIQ12.gain(0, 0.0); mixIQ12.gain(1, 4.0); mixIQ12.gain(2, 0.0); mixIQ12.gain(3, 0.0);// 
-          
-          if (!(intBandwidth == 3000)); intBandwidth = 3000; SetFilterBandwidth(intBandwidth);
-          sine_VLF_Dnmix_Mod.amplitude(0);
-          InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
-        }
-      if (intMode == 18)//TEST6K
-        {
-          blnTestMode6K = true; blnTestMode3K = false; intTestFreqHz = 3000; intTargetSN = 40;
-          // Set gains to over ride other mode settings:
-          ampLeftOut.gain(1.0); ampRightOut.gain(2.0);
-          mixInpSel.gain(0, 2.00); mixInpSel.gain(1, 0.0); mixInpSel.gain(2, 0.0); mixInpSel.gain(3, 0.0);
-          mixIQ12.gain(0, 0.0); mixIQ12.gain(1, 4.0); mixIQ12.gain(2, 0.0); mixIQ12.gain(3, 0.0);//
-          sine_VLF_Dnmix_Mod.amplitude(0);
-          if (!(intBandwidth == 6000)); intBandwidth = 6000; SetFilterBandwidth(intBandwidth);
-          InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
-        }
+      if ((intMode == 17) || (intMode == 18)) {ApplyTestMode(intMode);}//TEST3K, TEST6K
        
       blnInitialized = true;
       blnInitSpectrum = true;
@@ -2280,24 +2325,12 @@ void loop()
           
         if (intMode == 17)//TEST3K (Sine)
           {
-            SetFilterBandwidth(3000);
-            intTestFreqHz = intTestFreqHz + 100 * (lngENC1New - lngENC1Old); //Inc/Dec by 100 Hz per click
-            if (intTestFreqHz > 3300) {intTestFreqHz = 3300; }//Hold at stops
-            if (intTestFreqHz < 300) { intTestFreqHz = 300;} //Hold at 300 Hz. Lower limit is ~40 Hz at -.5dB (-1.5 dB @10 Hz) with 10 uf Caps.
-            intBandwidth = 3000; intTuneOffset = 0;
-            InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
-            mixInpSel.gain(0, 2); mixInpSel.gain(1, 0); mixInpSel.gain(2, 0); mixInpSel.gain(3, 0);
+            SetTestFrequency(intTestFreqHz + 100 * (lngENC1New - lngENC1Old)); //Inc/Dec by 100 Hz per click
           }
         if (intMode == 18)//TEST6K (Sine)
           {
-            SetFilterBandwidth(6000);
-            intTestFreqHz = intTestFreqHz + 200 * (lngENC1New - lngENC1Old); //Inc/Dec by 200 Hz per click
-            if (intTestFreqHz > 6300) {intTestFreqHz = 6300;} //Hold at stops
-            if (intTestFreqHz < 300) {intTestFreqHz = 300;}
-            intBandwidth = 6000; intTuneOffset = 0;
-            InputTestWaveform.frequency (intTestFreqHz); InputTestWaveform.amplitude(fltCalTestLevel);
-            mixInpSel.gain(0, 2); mixInpSel.gain(1, 0); mixInpSel.gain(2, 0); mixInpSel.gain(3, 0);
-          }     
+            SetTestFrequency(intTestFreqHz + 200 * (lngENC1New - lngENC1Old)); //Inc/Dec by 200 Hz per click
+          }
         lngENC1Old = lngENC1New;
       }
     else
@@ -2633,9 +2666,8 @@ void loop()
      
         
   // Adjust  S:N only every 2-5 ms 
-  if (int(ulngCurrentElapsedTimeUs - ulngLastSNUpdateUs) > random(2000, 5000)); // Only adjust S:N every 2-5ms
+  if (int(ulngCurrentElapsedTimeUs - ulngLastSNUpdateUs) > random(2000, 5000)) // Only adjust S:N every 2-5ms
     {
-      if (blnSim) { AdjustS_N ( intTargetSN, fltppLPInputMeasAvg, true);}// operator-set target S:N (boot/dial/serial): prints one calibration block on change
       ulngLastSNUpdateUs = ulngCurrentElapsedTimeUs;
       // Code for Fading a Channel (modes 0-4) WGN,MPG,MPM,MPP,MPD
       if ((intFadeDepth_dB > 0) && (fltFadeRate > .01) && blnSim)
@@ -2785,7 +2817,8 @@ void loop()
             {
               if (strCmd == "BUSY")
                 {
-                  blnSim = false;  blnInitialized = false;  blnEnableTestTone = false;
+                  ClearTestSource();
+                  blnSim = false;  blnInitialized = false;
                   InitializeBusy();
                   ulngAppliedGeneration++;
                   Serial.println("OK");
@@ -2820,7 +2853,7 @@ void loop()
                 }
               else if (intSerialCmdMode > -1)
                 {
-                  if (IsIntegerParameter(strParameter) && ParseSetBusyParameter(strParameter, intSerialCmdMode)){ulngAppliedGeneration++; Serial.println("OK");} //Serial Command is OK
+                  if (IsIntegerParameter(strParameter) && ParseSetBusyParameter(strParameter, intSerialCmdMode)){intBusyMode = intSerialCmdMode; ulngAppliedGeneration++; Serial.println("OK");} //Serial Command is OK
                   else {Serial.println("?"); intSerialCmdMode = -1;} //Serial Command fail
                 }
               else {Serial.println("?");}

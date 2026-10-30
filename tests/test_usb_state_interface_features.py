@@ -4,13 +4,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FIRMWARES = (
-    ROOT / "src" / "HFSim_BFD_2_05" / "HFSim_BFD_2_05.ino",
+    ROOT / "src" / "HFSim_BFD_2_06" / "HFSim_BFD_2_06.ino",
     ROOT
     / "hardware"
     / "Alternate hardware platforms"
     / "src"
-    / "HFSim_BFD_2_05_Proto"
-    / "HFSim_BFD_2_05_Proto.ino",
+    / "HFSim_BFD_2_06_Proto"
+    / "HFSim_BFD_2_06_Proto.ino",
 )
 
 
@@ -25,7 +25,7 @@ class USBStateInterfaceFeatureTest(unittest.TestCase):
             with self.subTest(firmware=str(firmware.relative_to(ROOT))):
                 source = firmware.read_text(encoding="utf-8")
 
-                self.assertIn('#define HFSIM_FIRMWARE_REVISION "2.05"', source)
+                self.assertIn('#define HFSIM_FIRMWARE_REVISION "2.06"', source)
                 self.assertIn('Serial.print(" REV=" HFSIM_FIRMWARE_REVISION)', source)
                 self.assertIn('F("HELP IONOS SIM Rev " HFSIM_FIRMWARE_REVISION)', source)
 
@@ -74,6 +74,8 @@ class USBStateInterfaceFeatureTest(unittest.TestCase):
                 self.assertIn("PrintLevelFields();", status)
 
                 level_fields = section(source, "void PrintLevelFields()", "void PrintStatus()")
+                self.assertIn("int(fltppInputForDisplay)", level_fields)
+                self.assertIn('" INPUT_MVPP_MAXHOLD="', level_fields)
                 for measured_level in (
                     "fltppLPInputMeasAvg",
                     "fltppAmpLeftOutAvg",

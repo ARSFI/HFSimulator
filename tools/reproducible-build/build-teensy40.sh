@@ -20,6 +20,10 @@ readonly OUTPUT_DIRECTORY="$2"
 
 readonly REPOSITORY_ROOT="$(git rev-parse --show-toplevel)"
 readonly ARDUINO_CLI_BIN="${ARDUINO_CLI_BIN:-arduino-cli}"
+CLI_CONFIG_ARGS=()
+if [[ -n "${ARDUINO_CLI_CONFIG_FILE:-}" ]]; then
+  CLI_CONFIG_ARGS=(--config-file "${ARDUINO_CLI_CONFIG_FILE}")
+fi
 readonly ARDUINO_DATA_DIRECTORY="${ARDUINO_DATA_DIRECTORY:-${HOME}/.arduino15}"
 readonly PLATFORM_DIRECTORY="${ARDUINO_DATA_DIRECTORY}/packages/teensy/hardware/avr/${EXPECTED_CORE_VERSION}"
 readonly CLI_PATH="$(command -v "${ARDUINO_CLI_BIN}")"
@@ -33,7 +37,7 @@ readonly GIT_DESCRIBE="$(git -C "${REPOSITORY_ROOT}" describe --always --long)"
   echo "arduino-cli SHA-256 mismatch" >&2
   exit 1
 }
-"${CLI_PATH}" version | grep -F "Version: ${EXPECTED_CLI_VERSION}" >/dev/null
+"${CLI_PATH}" "${CLI_CONFIG_ARGS[@]}" version | grep -F "Version: ${EXPECTED_CLI_VERSION}" >/dev/null
 [[ "$(sha256sum "${PLATFORM_DIRECTORY}/boards.txt" | awk '{print $1}')" == "${EXPECTED_BOARDS_SHA256}" ]]
 [[ "$(sha256sum "${PLATFORM_DIRECTORY}/platform.txt" | awk '{print $1}')" == "${EXPECTED_PLATFORM_SHA256}" ]]
 [[ -d "${ARDUINO_DATA_DIRECTORY}/packages/teensy/tools/teensy-compile/${EXPECTED_COMPILE_VERSION}" ]]
@@ -43,7 +47,7 @@ done
 
 mkdir -p "${OUTPUT_DIRECTORY}"
 readonly OUTPUT_ABSOLUTE="$(cd "${OUTPUT_DIRECTORY}" && pwd)"
-readonly STAGING_ROOT="$(mktemp -d /dev/shm/hfsim-teensy40-repro.XXXXXX)"
+readonly STAGING_ROOT="$(mktemp -d "${LANE_SCRATCH:-${TMPDIR:-/dev/shm}}/hfsim-teensy40-repro.XXXXXX")"
 trap 'rm -rf -- "${STAGING_ROOT}"' EXIT
 readonly WORK_DIRECTORY="${STAGING_ROOT}/work"
 readonly BUILD_DIRECTORY="${STAGING_ROOT}/build"
@@ -78,10 +82,10 @@ write_manifest() {
     printf 'platform_txt_sha256=%s\n' "${EXPECTED_PLATFORM_SHA256}"
     printf 'teensy_compile_version=%s\n' "${EXPECTED_COMPILE_VERSION}"
     printf 'audio_tree=%s\n' "$(git -C "${REPOSITORY_ROOT}" rev-parse HEAD:src/libraries/Audio)"
-    printf 'bounce2_tree=%s\n' "$(git -C "${REPOSITORY_ROOT}" rev-parse HEAD:src/libraries/Bounce2)"
-    printf 'ili9341_t3_tree=%s\n' "$(git -C "${REPOSITORY_ROOT}" rev-parse HEAD:src/libraries/ILI9341_t3)"
-    printf 'encoder_tree=%s\n' "$(git -C "${REPOSITORY_ROOT}" rev-parse HEAD:src/libraries/Encoder)"
-    printf 'encoder2_h_sha256=%s\n' "$(git -C "${REPOSITORY_ROOT}" show HEAD:src/HFSim_BFD_2_05/Encoder2.h | sha256sum | awk '{print $1}')"
+    printf 'bounce2_tree=%s\n' "$(git -C "${REPOSITORY_ROOT}" rev-parse HEAD:src/HFSim_BFD_2_06/libraries/Bounce2)"
+    printf 'ili9341_t3n_tree=%s\n' "$(git -C "${REPOSITORY_ROOT}" rev-parse HEAD:src/HFSim_BFD_2_06/libraries/ILI9341_t3n)"
+    printf 'encoder2_tree=%s\n' "$(git -C "${REPOSITORY_ROOT}" rev-parse HEAD:src/HFSim_BFD_2_06/libraries/Encoder2)"
+    printf 'encoder2_h_sha256=%s\n' "$(git -C "${REPOSITORY_ROOT}" show HEAD:src/HFSim_BFD_2_06/libraries/Encoder2/Encoder2.h | sha256sum | awk '{print $1}')"
   } > "${destination}"
 }
 
@@ -90,24 +94,24 @@ compile_once() {
   rm -rf -- "${WORK_DIRECTORY}" "${BUILD_DIRECTORY}" "${EXPORT_DIRECTORY}"
   mkdir -p "${WORK_DIRECTORY}" "${BUILD_DIRECTORY}" "${EXPORT_DIRECTORY}"
   git -C "${REPOSITORY_ROOT}" archive --format=tar HEAD | tar -xf - -C "${WORK_DIRECTORY}"
-  cp -a "${WORK_DIRECTORY}/src/libraries/Encoder/utility" "${WORK_DIRECTORY}/src/HFSim_BFD_2_05/utility"
-  write_identity_header "${WORK_DIRECTORY}/src/HFSim_BFD_2_05"
+  write_identity_header "${WORK_DIRECTORY}/src/HFSim_BFD_2_06"
 
   local run_output="${OUTPUT_ABSOLUTE}/${run_name}"
   mkdir -p "${run_output}/build" "${run_output}/artifacts"
-  cp "${WORK_DIRECTORY}/src/HFSim_BFD_2_05/BuildIdentity.h" "${run_output}/BuildIdentity.h"
+  cp "${WORK_DIRECTORY}/src/HFSim_BFD_2_06/BuildIdentity.h" "${run_output}/BuildIdentity.h"
   write_manifest "${run_output}/build-manifest.txt"
 
-  "${CLI_PATH}" compile \
+  "${CLI_PATH}" "${CLI_CONFIG_ARGS[@]}" compile \
     --fqbn "${FQBN}" \
     --build-path "${BUILD_DIRECTORY}" \
     --output-dir "${EXPORT_DIRECTORY}" \
     --library "${WORK_DIRECTORY}/src/libraries/Audio" \
-    --library "${WORK_DIRECTORY}/src/libraries/Bounce2" \
-    --library "${WORK_DIRECTORY}/src/libraries/ILI9341_t3" \
+    --library "${WORK_DIRECTORY}/src/HFSim_BFD_2_06/libraries/Bounce2" \
+    --library "${WORK_DIRECTORY}/src/HFSim_BFD_2_06/libraries/ILI9341_t3n" \
+    --library "${WORK_DIRECTORY}/src/HFSim_BFD_2_06/libraries/Encoder2" \
     --warnings all \
     --verbose \
-    "${WORK_DIRECTORY}/src/HFSim_BFD_2_05" \
+    "${WORK_DIRECTORY}/src/HFSim_BFD_2_06" \
     2>&1 | tee "${run_output}/compile.log"
 
   cp -a "${BUILD_DIRECTORY}/." "${run_output}/build/"
