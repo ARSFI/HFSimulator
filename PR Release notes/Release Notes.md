@@ -25,6 +25,31 @@ PR-2  Serial channel mode commands never applied the selected mode
 
 Rev 2.06
 
+PR-7
+The main loop prints a calibration report over USB every 20,000 RMS updates, even with DEBUG OFF:
+
+if (intCountrmsMixIQ1234Out == 20000 * (intCountrmsMixIQ1234Out/20000))// only print every 20000 updates
+
+When a controlling program opens the port only to send a command and read the reply, nobody is reading at the moment that report goes out. The Teensy USB serial writer can then wait on an un-drained transmit buffer (up to about 120 ms before its first timeout), and loop() stalls for that long. On a long quiet bench capture we see an isolated disturbance at about 295.7 s after a channel command, which matches the predicted first possible stall from this report under that usage.
+
+This change prints the report only with DEBUG ON, like the other calibration diagnostics:
+
+if (blnDebugAdjustSN && (intCountrmsMixIQ1234Out == 20000 * (intCountrmsMixIQ1234Out/20000))) // only print every 20000 updates
+
+Unchanged: the counter and all RMS calculations, command replies, display, DSP settings, and the DEBUG default (OFF). DEBUG ON keeps its existing meaning, so its diagnostics may still block a non-reading host.
+
+Changes
+
+    src/HFSim_BFD_2_06/HFSim_BFD_2_06.ino and the alternate-hardware HFSim_BFD_2_06_Proto.ino: gate the report on blnDebugAdjustSN.
+    tests/test_periodic_rms_report.py: source test that the report is gated on DEBUG in both sketches and that DEBUG is declared once, default OFF. It fails on current master and passes with this change.
+
+Testing
+
+    Full test suite: 39 tests pass (cd tests && python3 -m unittest discover -p 'test_*.py').
+    tools/reproducible-build/build-teensy40.sh: two fresh builds produce byte-identical Teensy 4.0 HEX.
+    Not yet flashed or measured on hardware; a run with DEBUG OFF and a host that is not reading between commands should no longer show the stall.
+
+-----------------------
 Rev 2.06: fix flat-fade gains and match serial level to the front panel
 
 This combines the stray-semicolon fixes and the serial level correction in one Rev 2.06 release, based on 3cd1f7e.
