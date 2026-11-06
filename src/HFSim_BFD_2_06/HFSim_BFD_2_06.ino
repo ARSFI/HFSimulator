@@ -11,7 +11,8 @@
        WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     Change  Log:
-    Date:     Rev:      Description:
+    Date:        Rev:   Description:
+    11/06/2026   2.06   PR-8 Gate the periodic RMS report on DEBUG (avoid USB stalls with a non-reading host)
     10/27/2026   2.06   Fix stray semicolons and unfaded S:N updates during flat fading; match serial input level to the front panel and retain max-hold separately.
     10/27/2026   2.05b1 Updtaed to ILI9341_t3n.h, removed extra tft.begin();
     9/21/2026    2.05   Classify the AdjustS_N calibration debug output by source: the fade loop's internal per-step S:N changes no longer print (so a running fade cannot flood the serial link), while operator-initiated changes (boot, front-panel dial, serial S:N command) still print one block. DEBUG ON|OFF verb re-enables the legacy per-step firehose and STATUS reports its state.
