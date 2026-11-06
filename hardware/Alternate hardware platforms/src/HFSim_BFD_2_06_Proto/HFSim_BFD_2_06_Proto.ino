@@ -2504,7 +2504,9 @@ void loop()
           fltrmsMixIQ1234OutPeak = max(fltrmsMixIQ1234OutPeak, fltrmsMixIQ1234Out);
           //This computes the long term >20 minutes) average rms to allow calibration of Scale factors (fltSTD) for Multipath
           
-          if (intCountrmsMixIQ1234Out == 20000 *  (intCountrmsMixIQ1234Out/20000))// only print every 20000 updates 
+          // Periodic calibration telemetry is opt-in (DEBUG ON), like the fade-loop diagnostics: an unsolicited
+          // USB write can wait on a host that is not reading the port and stall loop().
+          if (blnDebugAdjustSN && (intCountrmsMixIQ1234Out == 20000 * (intCountrmsMixIQ1234Out/20000))) // only print every 20000 updates
             {
               Serial.print("Line 2125: fltrmsLPInputMeasAvg= "); Serial.print(fltrmsLPInputMeasAvg);
               Serial.print("  rmsMixIQ1234Out = " );Serial.print(fltrmsMixIQ1234Out); 
