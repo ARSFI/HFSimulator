@@ -1,6 +1,9 @@
 Pull-Request Release Notes
 
-PR-6  Rev 2.06: fix flat-fade gains and match serial level to the front panelRelease Notes.txt
+PR-8  Gate the periodic RMS report on DEBUG (avoid USB stalls with a non-reading host)
+
+
+PR-7  Rev 2.06: fix flat-fade gains and match serial level to the front panelRelease Notes.txt
 #7·by xmutantson was merged 2 days ago Contributor
 1
 2
@@ -25,7 +28,7 @@ PR-2  Serial channel mode commands never applied the selected mode
 
 Rev 2.06
 
-PR-7
+PR-8
 The main loop prints a calibration report over USB every 20,000 RMS updates, even with DEBUG OFF:
 
 if (intCountrmsMixIQ1234Out == 20000 * (intCountrmsMixIQ1234Out/20000))// only print every 20000 updates
@@ -50,6 +53,8 @@ Testing
     Not yet flashed or measured on hardware; a run with DEBUG OFF and a host that is not reading between commands should no longer show the stall.
 
 -----------------------
+
+PR-7 
 Rev 2.06: fix flat-fade gains and match serial level to the front panel
 
 This combines the stray-semicolon fixes and the serial level correction in one Rev 2.06 release, based on 3cd1f7e.
